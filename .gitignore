@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.claude/
+# Built every run and published straight to GitHub Pages, so it isn't committed.
+site/data/

@@ -1,0 +1,64 @@
+name: Update forecast
+
+on:
+  schedule:
+    - cron: "23 */2 * * *"   # every 2 hours, off the top of the hour (GitHub's busiest minute)
+  workflow_dispatch:          # "Run workflow" button in the Actions tab
+  push:
+    paths: ["courts.csv", "courtcast/**", "site/**", ".github/workflows/update.yml"]
+
+permissions:
+  contents: write   # commit the daily snapshot
+  pages: write      # publish the map
+  id-token: write
+
+concurrency:
+  group: update-forecast
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test the scoring rules
+        run: python -m unittest discover -s tests -t .
+
+      - name: Fetch forecast and build map data
+        run: python -m courtcast.build --out site/data/forecast.json --snapshot-dir data/snapshots
+
+      - name: Commit the daily snapshot (first run of each Pacific day)
+        run: |
+          # Commits authored with the GitHub noreply address count toward the
+          # contribution graph without exposing a personal email.
+          git config user.name "Grant Jape"
+          git config user.email "190882422+grant-jape@users.noreply.github.com"
+          git add data/snapshots
+          if git diff --cached --quiet; then
+            echo "Already have today's snapshot; nothing to commit."
+          else
+            day=$(TZ=America/Los_Angeles date +%F)
+            git commit -m "data: forecast snapshot for $day"
+            git pull --rebase --quiet
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
