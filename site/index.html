@@ -4,30 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IE CourtCast</title>
-  <meta name="description" content="Court-by-court tennis weather for the Inland Empire: wind, rain and a playability score on a map.">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <meta name="description" content="Court-by-court tennis weather for the Inland Empire: is it good to play, and where?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <h1>IE CourtCast</h1>
-      <span id="updated" class="muted">Loading forecast…</span>
+      <span class="ball" aria-hidden="true"></span>
+      <div>
+        <h1>IE CourtCast</h1>
+        <div id="updated" class="muted small">Loading forecast…</div>
+      </div>
     </div>
     <div class="controls">
-      <div class="seg" role="group" aria-label="Map layer">
-        <button data-layer="play" aria-pressed="true">Playability</button>
-        <button data-layer="wind" aria-pressed="false">Wind</button>
-        <button data-layer="rain" aria-pressed="false">Rain</button>
+      <div class="seg" role="group" aria-label="What to show on the map">
+        <button data-layer="play" aria-pressed="true"><span class="dot ball-dot" aria-hidden="true"></span> Play</button>
+        <button data-layer="wind" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6h8.2a2.2 2.2 0 1 0-2.1-2.9M1.5 10h11a2 2 0 1 1-1.9 2.6M1.5 8h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Wind</button>
+        <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
       </div>
-      <label class="check"><input type="checkbox" id="schools"> School courts</label>
+      <label class="toggle"><input type="checkbox" id="schools"><span class="track" aria-hidden="true"></span> Schools</label>
     </div>
   </header>
 
   <main class="layout">
     <section class="mapwrap">
-      <div id="map" aria-label="Map of courts and conditions"></div>
+      <div id="map" aria-label="Map of tennis courts and conditions"></div>
       <div class="legend" id="legend"></div>
+      <article id="card" class="card" hidden aria-live="polite"></article>
     </section>
 
     <aside class="panel">
@@ -37,16 +44,16 @@
   </main>
 
   <footer class="timebar">
-    <button id="prev" aria-label="Previous hour">‹</button>
+    <button id="prev" class="round" aria-label="Previous hour">‹</button>
     <div class="slider">
       <input type="range" id="hour" min="0" max="35" value="0" aria-label="Forecast hour">
       <div class="timeinfo"><strong id="timeLabel">—</strong> <span id="dayLabel" class="muted"></span></div>
     </div>
-    <button id="next" aria-label="Next hour">›</button>
+    <button id="next" class="round" aria-label="Next hour">›</button>
     <button id="now" class="nowbtn">Now</button>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
