@@ -1,18 +1,19 @@
 # Tennis CourtCast 🎾
 
-**Court-by-court tennis weather for the Inland Empire.** A map of every public court from Claremont to Fontana, colored by a 0–10 playability score, with wind and rain layers and a time slider for the next 36 hours.
+**Court-by-court tennis weather for Southern California.** A map of public tennis courts from Santa Barbara to San Diego, each colored by a 0–10 playability score, with rain and wind shading and a time slider for the next 36 hours. It started in the Inland Empire (Claremont to Fontana), which still gets the most detail.
 
 **Live map:** https://grant-jape.github.io/tennis-courtcast/
 
-Rain at Day Creek doesn't mean rain at Claremont. Fontana can be gusting 25 mph while Chino is calm. A single city forecast hides that. CourtCast pulls a forecast for every court and for a ~3 km grid across the region, so you can see where it's playable and when.
+Rain at Day Creek doesn't mean rain at Claremont. Fontana can be gusting 25 mph while Chino is calm. A single city forecast hides that. CourtCast gets a forecast for every court, so you can see where it's playable and when.
 
 ## What's on the map
 
-- **Playability layer:** each court pin shows its score. Grid squares tint red or amber where conditions are bad.
-- **Wind layer:** gust strength by area, with arrows showing which way the wind blows.
-- **Rain layer:** forecast rain amount by area.
-- **Time slider:** scrub through the next 36 hours. The URL updates, so you can share a link like `…/#t=2026-11-16T14` ("what about Monday 2pm?").
-- **Court popups:** current conditions, a 12-hour strip, and the best two-hour daylight window.
+- **Courts:** each court is a small tennis-court icon colored green / amber / red (play / iffy / skip), with its score underneath. Zoomed far out, courts become dots.
+- **Weather shading:** blue = rain, orange = wind, purple = both. Darker means heavier rain or stronger gusts.
+- **Play / Wind / Rain views:** Wind colors courts by wind alone and shows gusts in mph; Rain shows rain amounts.
+- **Time slider:** follows the real clock (Pacific time) and scrubs through the next 36 hours, shaded day and night.
+- **Court card:** tap a court for its verdict, temperature, wind and rain, a 12-hour strip with sun and moon icons, and the best two-hour daylight window.
+- **Shareable links:** the URL keeps the time, view, map position and selected court, e.g. `…/#court=day-creek-park&t=2026-11-16T14`.
 - **School courts** are behind a toggle because public access varies.
 
 ## How the score works
@@ -65,6 +66,15 @@ GitHub Actions (every 2 hours)
 ```
 
 The daily snapshot stores each court's next-24-hour forecast as issued. That log is the raw material for checking the forecast against what actually happened (see the roadmap).
+
+### Southern California: forecasts load in your browser
+
+Precomputing every SoCal court every 2 hours would blow past Open-Meteo's free limit (10,000 calls a day, counted per IP address): about 1,500 sites plus a weather grid, 12 times a day. So outside the Inland Empire the map works differently:
+
+- **Court list:** [`scripts/build_socal_courts.py`](scripts/build_socal_courts.py) builds `site/courts-socal.json` from OpenStreetMap: tennis courts grouped into sites, each named after the nearest park, school or college. Run it locally to refresh.
+- **Live forecasts:** when you zoom in on an area, *your browser* asks Open-Meteo for the courts on screen (up to ~120, nearest the center first) plus a small 7×7 grid for the shading, then scores them itself. Each visitor uses their own free allowance, so covering more area costs nothing extra.
+- **Same scoring everywhere:** the browser uses a copy of `score.py`. The thresholds come from the forecast data file, and [`tests/test_score_parity.py`](tests/test_score_parity.py) runs both versions on 5,000+ random hours and fails if they disagree.
+- **Trade-offs:** a new area takes a second or two to load, and only the Inland Empire is logged in the daily snapshots.
 
 ## Run it locally
 

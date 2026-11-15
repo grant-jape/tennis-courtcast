@@ -106,7 +106,14 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .legend .keys { display: flex; gap: 10px; margin-top: 4px; color: var(--ink-2); flex-wrap: wrap; }
 .legend .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
-/* Legend swatches for the weather shading (rain / wind / striped both). */
+.live-badge {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3;
+  background: var(--surface); color: var(--ink-2); border-radius: 999px; box-shadow: var(--shadow);
+  padding: 5px 12px; font-size: 12.5px; font-weight: 700;
+}
+.list li.hint { display: block; cursor: default; color: var(--ink-2); font-size: 13px; }
+
+/* Legend swatches for the weather shading (rain / wind / both). */
 .legend .sw { display: inline-block; width: 16px; height: 11px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
 /* ---------- court markers ---------- */
