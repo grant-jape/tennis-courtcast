@@ -509,6 +509,14 @@
     map.touchZoomRotate.disableRotation();
     map.on("error", (e) => console.warn("map:", e.error && e.error.message));
     map.on("idle", () => { document.body.dataset.mapReady = "1"; });  // lets tests know rendering finished
+    // Start the map credits (the ⓘ button) collapsed. MapLibre opens them on wide
+    // screens; they stay one tap away, which keeps the required attribution.
+    const collapseCredits = () => {
+      const el = map.getContainer().querySelector(".maplibregl-ctrl-attrib");
+      if (el) { el.classList.remove("maplibregl-compact-show"); el.removeAttribute("open"); }
+    };
+    map.once("load", collapseCredits);
+    map.once("idle", collapseCredits);
     // "style.load" fires once the style is ready; "load" would also wait for every
     // tile, which on a slow phone connection delays the court list for no reason.
     map.once("style.load", () => {
