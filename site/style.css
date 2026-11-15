@@ -106,17 +106,8 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .legend .keys { display: flex; gap: 10px; margin-top: 4px; color: var(--ink-2); flex-wrap: wrap; }
 .legend .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
-/* ---------- weather icons (behind the courts, faded) ---------- */
-:root { --wx-rain: #3f86d8; --wx-cloud: #8f9aa6; --wx-wind: #4f8796; }
-@media (prefers-color-scheme: dark) { :root { --wx-rain: #6aa8f0; --wx-cloud: #a3adb8; --wx-wind: #7fb6c4; } }
-.wx { display: flex; gap: 2px; pointer-events: none; }
-.wx svg { width: 34px; height: 34px; opacity: .45; }
-.wx svg.strong { width: 42px; height: 42px; opacity: .6; }
-.wx-rain { color: var(--wx-rain); }
-.wx-rain.cloud { color: var(--wx-cloud); }
-.wx-wind { color: var(--wx-wind); }
-.legend .wxk { display: inline-flex; align-items: center; gap: 3px; }
-.legend .wxk svg { width: 20px; height: 20px; }
+/* Legend swatches for the weather shading (rain / wind / striped both). */
+.legend .sw { display: inline-block; width: 16px; height: 11px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
 /* ---------- court markers ---------- */
 .court-marker { cursor: pointer; display: flex; flex-direction: column; align-items: center; }
@@ -259,7 +250,4 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
   .pin { padding: 1.5px; }
   .pin svg.court { width: 24px; height: 14px; }
   .pin.school svg.court { width: 20px; height: 12px; }
-  .lbl { font-size: 11.5px; padding: 1.5px 5px; margin-top: 1px; }
-  .wx svg { width: 28px; height: 28px; }
-  .wx svg.strong { width: 34px; height: 34px; }
-}
+  .lbl { font-size: 11.5px; padding: 1.5px 5px; margin-top: 1px; }}
