@@ -1,4 +1,4 @@
-/* IE CourtCast map: reads data/forecast.json (built by courtcast/build.py). */
+/* Tennis CourtCast map: reads data/forecast.json (built by courtcast/build.py). */
 (() => {
   "use strict";
 

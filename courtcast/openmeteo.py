@@ -16,7 +16,7 @@ URL = "https://api.open-meteo.com/v1/forecast"
 
 def _get(params, retries=3):
     url = URL + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": "ie-courtcast/0.1"})
+    req = urllib.request.Request(url, headers={"User-Agent": "tennis-courtcast/0.1"})
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
