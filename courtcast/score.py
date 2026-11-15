@@ -49,9 +49,27 @@ def score_hour(h: Hour):
     penalties.append((ramp(h.temp, **C.HEAT), f"Hot ({h.temp:.0f}°F)"))
     penalties.append((ramp(h.temp, **C.COLD), f"Cold ({h.temp:.0f}°F)"))
 
-    score = round(max(0.0, 10.0 - sum(p for p, _ in penalties)), 1)
+    score = max(0.0, 10.0 - sum(p for p, _ in penalties))
+    # Wind sets a ceiling: a skip-level gust can't be outweighed by nice temperatures.
+    wb = wind_band(h.gust, h.wind)
+    if wb == "skip":
+        score = min(score, C.WIND_SKIP_CAP)
+    elif wb == "iffy":
+        score = min(score, C.WIND_IFFY_CAP)
+    score = round(score, 1)
     reasons = [r for p, r in sorted(penalties, reverse=True) if p >= 0.75][:2]
+    if wb != "play" and not any(r.startswith(("Gusts", "Wind")) for r in reasons):
+        reasons = [f"Gusts {h.gust:.0f} mph"] + reasons[:1]
     return score, band(score), reasons
+
+
+def wind_band(gust, wind):
+    """Play / iffy / skip from wind alone (thresholds and evidence in config.py)."""
+    if gust >= C.WIND_SKIP_GUST or wind >= C.WIND_SKIP_SUSTAINED:
+        return "skip"
+    if gust >= C.WIND_IFFY_GUST or wind >= C.WIND_IFFY_SUSTAINED:
+        return "iffy"
+    return "play"
 
 
 def band(score):
