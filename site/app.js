@@ -46,15 +46,22 @@
     temp: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.4V3a1.5 1.5 0 0 1 3 0v6.4a3 3 0 1 1-3 0z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8" cy="11.8" r="1.2" fill="currentColor"/></svg>',
   };
 
-  // A top-down tennis court, surface coloured by how playable it is.
-  function courtSvg(band) {
+  // A top-down tennis court, surface coloured by how playable it is. With a
+  // label, the number is painted on the court like a scoreboard and the court
+  // lines fade back so it stays readable at small sizes.
+  function courtSvg(band, label) {
+    const ink = band === "iffy" ? "#1f2328" : "#fff";   // dark text on amber, white elsewhere
+    const lines = label == null ? 1 : 0.35;
+    const text = label == null ? "" :
+      `<text x="15" y="9.4" text-anchor="middle" dominant-baseline="central" fill="${ink}"
+        font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="${String(label).length > 3 ? 8.6 : 10}">${label}</text>`;
     return `<svg class="court" viewBox="0 0 30 18" aria-hidden="true">
       <rect x=".75" y=".75" width="28.5" height="16.5" rx="3.5" fill="${PAL[band]}"/>
-      <g fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round">
+      <g fill="none" stroke="${ink}" stroke-width="1.2" stroke-linecap="round" opacity="${lines}">
         <rect x="3.5" y="3" width="23" height="12" rx=".4"/>
         <path d="M9.5 3V15M20.5 3V15M9.5 9H20.5"/>
-      </g>
-      <path d="M15 1.6V16.4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+        <path d="M15 1.6V16.4" stroke-width="2"/>
+      </g>${text}
     </svg>`;
   }
 
@@ -165,15 +172,25 @@
       el.tabIndex = 0;
       el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); });
       el.addEventListener("keydown", (e) => { if (e.key === "Enter") select(ct.id); });
-      const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -13] }).setLngLat([ct.lon, ct.lat]);
+      const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -17] }).setLngLat([ct.lon, ct.lat]);
       markers.push({ ct, el, m, shown: false });
     });
   }
 
+  // The number painted on each court: score, gusts (mph), or rain (inches, else chance).
   function chipValue(ct, h) {
-    if (state.layer === "wind") return `${ct.g[h]}<small> mph</small>`;
-    if (state.layer === "rain") return ct.r[h] > 0 ? `${ct.r[h].toFixed(2)}″` : `${ct.p[h]}%`;
+    if (state.layer === "wind") return String(ct.g[h]);
+    if (state.layer === "rain") return ct.r[h] > 0 ? `${ct.r[h].toFixed(2).replace(/^0/, "")}″` : `${ct.p[h]}%`;
     return ct.s[h] >= 10 ? "10" : ct.s[h].toFixed(1);
+  }
+
+  // How notable a court is for the current view; higher sits on top when markers overlap.
+  function notability(ct, h) {
+    if (ct.id === state.selected) return 1e6;
+    const school = ct.type === "school" ? 0 : 1e5;
+    if (state.layer === "wind") return school + ct.g[h];
+    if (state.layer === "rain") return school + ct.r[h] * 1000 + ct.p[h];
+    return school + ct.s[h] * 10;
   }
 
   function renderMarkers() {
@@ -185,7 +202,8 @@
       const b = ct.b[h];
       el.classList.toggle("selected", state.selected === ct.id);
       el.setAttribute("aria-label", `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10`);
-      el.innerHTML = `<div class="chip ${b}${ct.type === "school" ? " school" : ""}">${courtSvg(b)}<span class="val">${chipValue(ct, h)}</span></div><div class="nm">${ct.name}</div>`;
+      el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b, chipValue(ct, h))}</div><div class="nm">${ct.name}</div>`;
+      el.style.zIndex = String(Math.round(notability(ct, h)));
       if (!mk.shown) { m.addTo(map); mk.shown = true; }
     });
   }
@@ -328,14 +346,10 @@
     $("list").addEventListener("click", pick);
     $("list").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
     map.on("click", () => { if (state.selected) { state.selected = null; render(); saveHash(); } });
-    // Zoom tiers, like Waze: far out = court icons only, closer = scores, closest = names.
-    const tiers = () => {
-      const z = map.getZoom(), el = map.getContainer();
-      el.classList.toggle("compact", z < 10.6);
-      el.classList.toggle("show-names", z >= 12.5);
-    };
-    map.on("zoom", tiers);
-    tiers();
+    // Names appear once you're zoomed in (numbers are always on the courts).
+    const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
+    map.on("zoom", names);
+    names();
   }
 
   function start() {
@@ -349,7 +363,8 @@
       container: "map",
       style: STYLE_URL,
       bounds: [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-      fitBoundsOptions: { padding: { top: 70, bottom: 40, left: 40, right: 40 } },
+      // Tighter margins on phones so the map opens more zoomed in and courts spread out.
+      fitBoundsOptions: { padding: innerWidth < 760 ? { top: 60, bottom: 16, left: 14, right: 14 } : { top: 70, bottom: 40, left: 40, right: 40 } },
       attributionControl: { compact: true, customAttribution: 'Forecast: <a href="https://open-meteo.com/">Open-Meteo</a>' },
       dragRotate: false,
       pitchWithRotate: false,

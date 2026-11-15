@@ -106,32 +106,24 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 
 /* ---------- court markers ---------- */
 .court-marker { cursor: pointer; display: flex; flex-direction: column; align-items: center; }
-.chip {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px;
-  background: var(--surface); color: var(--ink); border-radius: 999px; box-shadow: var(--shadow);
-  font-weight: 800; font-size: 13px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums;
+/* Each court is a small white-framed tennis court with its number painted on it. */
+.pin {
+  display: block; padding: 2px; background: var(--surface); border-radius: 7px; box-shadow: var(--shadow);
   border: 2px solid transparent; transition: transform .12s;
 }
-.chip svg.court { width: 34px; height: 20px; display: block; }
+.pin svg.court { width: 46px; height: 28px; display: block; }
+.pin.school svg.court { width: 38px; height: 23px; }
+.court-marker:hover .pin, .court-marker.selected .pin { transform: scale(1.15); }
+.court-marker.selected .pin { border-color: var(--accent); }
 .ic { width: 15px; height: 15px; vertical-align: -2px; flex: none; }
 .seg button { display: inline-flex; align-items: center; gap: 6px; }
 .ball-dot { width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f4ff8a, #c9e021 60%, #a9c010); display: inline-block; }
 .facts span { display: inline-flex; align-items: center; gap: 5px; }
-.court-marker:hover .chip, .court-marker.selected .chip { transform: scale(1.12); }
-.court-marker.selected .chip { border-color: var(--accent); }
-.chip.school { padding: 2px; }
-.chip.school svg.court { width: 22px; height: 13px; }
-.chip.school .val { display: none; }
-.show-names .chip.school { padding: 2px 6px 2px 3px; }
-.show-names .chip.school .val { display: inline; font-size: 11.5px; }
 .court-marker .nm {
   display: none; margin-top: 3px; padding: 1px 6px; border-radius: 6px; font-size: 11.5px; font-weight: 700;
   background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--ink-2); white-space: nowrap;
 }
 .show-names .court-marker .nm { display: block; }
-.compact .chip { padding: 3px; }
-.compact .chip .val { display: none; }
-.compact .chip.school svg.court { width: 18px; height: 11px; }
 
 /* ---------- court card ---------- */
 .card {
@@ -203,4 +195,7 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
   .timebar { position: sticky; bottom: 0; z-index: 10; }
   .card { left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; }
   .legend { top: 8px; left: 8px; }
+  /* Slightly smaller courts on phones; the painted number stays readable (~12px). */
+  .pin svg.court { width: 40px; height: 24px; }
+  .pin.school svg.court { width: 34px; height: 20px; }
 }
