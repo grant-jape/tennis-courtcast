@@ -18,7 +18,8 @@
     skip: { label: "Skip it", face: "🙁" },
   };
 
-  const state = { layer: "play", hour: 0, schools: false, selected: null };
+  // hour = slider position (index into DATA.times); base = index of the real current hour.
+  const state = { layer: "play", hour: 0, base: 0, schools: false, selected: null };
   let DATA, map, markers = [], field, PAL;
 
   // ---------- small helpers ----------
@@ -30,13 +31,37 @@
   const bandOf = (s) => (s >= DATA.bands.play ? "play" : s >= DATA.bands.iffy ? "iffy" : "skip");
   const compass = (deg) => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
 
+  // ---------- real time (always Pacific, wherever the viewer is) ----------
+  const PT = "America/Los_Angeles";
+  // The current Pacific hour in the same "YYYY-MM-DDTHH:00" form as DATA.times.
+  function pacificHourStamp(date = new Date()) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+      timeZone: PT, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+    }).formatToParts(date).map((x) => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
+  }
+  const clockText = () => new Date().toLocaleTimeString("en-US", { timeZone: PT, hour: "numeric", minute: "2-digit" });
+  // Where the real current hour sits in the forecast (the data can be ~2 h old).
+  function nowIndex() {
+    const stamp = pacificHourStamp();
+    const i = DATA.times.indexOf(stamp);
+    if (i >= 0) return i;
+    return stamp < DATA.times[0] ? 0 : DATA.times.length - 1;
+  }
+  const nextDate = (d) => { const [y, m, day] = d.split("-").map(Number); return new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10); };
+  function dayWord(d) {
+    const today = pacificHourStamp().slice(0, 10);
+    if (d === today) return "Today";
+    if (d === nextDate(today)) return "Tomorrow";
+    const [y, m, day] = d.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+  }
+
   function fmtTime(iso, short) {
     const [d, t] = iso.split("T");
-    const [y, m, day] = d.split("-").map(Number);
     const h = Number(t.slice(0, 2));
-    const wk = new Date(y, m - 1, day).toLocaleDateString("en-US", { weekday: "short" });
     const hh = `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
-    return short ? hh.replace(" ", "").toLowerCase() : `${wk} ${hh}`;
+    return short ? hh.replace(" ", "").toLowerCase() : `${dayWord(d)} ${hh}`;
   }
 
   // Small line icons (emoji render in odd colours on some systems).
@@ -294,8 +319,90 @@
     renderCard();
     renderLegend();
     renderList();
-    $("timeLabel").textContent = fmtTime(DATA.times[h]) + (h === 0 ? " (now)" : "");
-    $("dayLabel").textContent = DATA.is_day[h] ? "" : "· after dark, lit courts only";
+    renderTime();
+  }
+
+  // ---------- time bar ----------
+  function renderTime() {
+    const h = state.hour, ahead = h - state.base;
+    const dark = DATA.is_day[h] ? "" : "After dark · lit courts only";
+    if (ahead === 0) {
+      $("timeLabel").innerHTML = `<span class="live">Now</span> · ${clockText()}`;
+      $("dayLabel").textContent = dark || "Today";
+    } else {
+      $("timeLabel").textContent = fmtTime(DATA.times[h]);
+      $("dayLabel").textContent = `in ${ahead} hour${ahead === 1 ? "" : "s"}` + (dark ? ` · ${dark.toLowerCase()}` : "");
+    }
+    $("now").setAttribute("aria-pressed", String(ahead === 0));
+  }
+
+  // Slider runs from the real current hour to the end of the forecast. The bar is
+  // shaded day/night and labelled every 6 hours, with the weekday at midnight.
+  function buildTimeline() {
+    const slider = $("hour"), base = state.base, last = DATA.times.length - 1;
+    slider.min = base;
+    slider.max = last;
+    const span = Math.max(1, last - base);
+    const pos = (i) => (Math.min(last, Math.max(base, i)) - base) / span;
+    const stops = [];
+    for (let i = base; i <= last; i++) {
+      const c = DATA.is_day[i] ? "var(--day)" : "var(--night)";
+      stops.push(`${c} ${(pos(i - 0.5) * 100).toFixed(2)}% ${(pos(i + 0.5) * 100).toFixed(2)}%`);
+    }
+    $("track").style.background = `linear-gradient(90deg, ${stops.join(", ")})`;
+    const ticks = [];
+    for (let i = base + 1; i <= last; i++) {
+      const [d, t] = DATA.times[i].split("T");
+      const hr = Number(t.slice(0, 2));
+      if (hr % 6) continue;
+      const label = hr === 0 ? dayWord(d) : hr === 12 ? "12p" : hr < 12 ? `${hr}a` : `${hr - 12}p`;
+      // Match the native thumb's travel: it moves between thumb/2 and width - thumb/2.
+      ticks.push(`<span class="${hr === 0 ? "day" : ""}" style="left: calc(var(--thumb) / 2 + ${pos(i).toFixed(4)} * (100% - var(--thumb)))">${label}</span>`);
+    }
+    $("ticks").innerHTML = ticks.join("");
+  }
+
+  function showUpdated() {
+    const gen = new Date(DATA.generated_utc.replace("Z", ":00Z"));
+    const ageH = (Date.now() - gen) / 3.6e6;
+    const when = gen.toLocaleString("en-US", { timeZone: PT, weekday: "short", hour: "numeric", minute: "2-digit" });
+    $("updated").textContent = ageH > 4 ? `⚠ Forecast is ${Math.floor(ageH)} hours old (updated ${when} PT)` : `Updated ${when} PT`;
+  }
+
+  // Every 30 s: keep the clock live and move "now" forward when the hour turns over.
+  function tick() {
+    const nb = nowIndex();
+    if (nb !== state.base) {
+      const followingNow = state.hour === state.base;
+      state.base = nb;
+      if (followingNow || state.hour < nb) state.hour = nb;
+      buildTimeline();
+      $("hour").value = state.hour;
+      render();
+      saveHash();
+    } else {
+      renderTime();
+    }
+    showUpdated();
+  }
+
+  // Every 15 min (and when a phone comes back to the tab): pick up a newer forecast.
+  async function refreshData() {
+    try {
+      const d = await (await fetch("data/forecast.json", { cache: "no-cache" })).json();
+      if (d.generated_utc === DATA.generated_utc) return;
+      const keep = DATA.times[state.hour];
+      DATA = d;
+      markers.forEach((mk) => { const c = d.courts.find((x) => x.id === mk.ct.id); if (c) mk.ct = c; });
+      buildField();
+      state.base = nowIndex();
+      const i = DATA.times.indexOf(keep);
+      state.hour = Math.max(state.base, i >= 0 ? i : state.base);
+      buildTimeline();
+      $("hour").value = state.hour;
+      showUpdated();
+      render();
+    } catch (_) { /* offline or mid-deploy: try again next time */ }
   }
 
   // ---------- shareable links: #t=2026-11-16T14&layer=rain&court=day-creek-park ----------
@@ -310,14 +417,14 @@
     if (q.get("schools") === "1") { state.schools = true; $("schools").checked = true; }
     const t = q.get("t");
     const i = t ? DATA.times.findIndex((x) => x.startsWith(t)) : -1;
-    state.hour = i >= 0 ? i : 0;   // a stale link (time already passed) falls back to now
+    state.hour = i >= state.base ? i : state.base;   // a link to a time that already passed falls back to now
     $("hour").value = state.hour;
     const court = q.get("court");
     if (court && DATA.courts.some((c) => c.id === court)) state.selected = court;
   }
   function saveHash() {
     const q = new URLSearchParams();
-    if (state.hour > 0) q.set("t", DATA.times[state.hour].slice(0, 13));
+    if (state.hour > state.base) q.set("t", DATA.times[state.hour].slice(0, 13));
     if (state.layer !== "play") q.set("layer", state.layer);
     if (state.schools) q.set("schools", "1");
     if (state.selected) q.set("court", state.selected);
@@ -331,15 +438,17 @@
     }));
     $("schools").addEventListener("change", (e) => { state.schools = e.target.checked; render(); saveHash(); });
     const slider = $("hour");
-    slider.max = DATA.times.length - 1;
     const setHour = (h) => {
-      state.hour = Math.max(0, Math.min(DATA.times.length - 1, h));
+      state.hour = Math.max(state.base, Math.min(DATA.times.length - 1, h));
       slider.value = state.hour; render(); saveHash();
     };
     slider.addEventListener("input", () => setHour(Number(slider.value)));
     $("prev").addEventListener("click", () => setHour(state.hour - 1));
     $("next").addEventListener("click", () => setHour(state.hour + 1));
-    $("now").addEventListener("click", () => setHour(0));
+    $("now").addEventListener("click", () => setHour(state.base));
+    setInterval(tick, 30 * 1000);
+    setInterval(refreshData, 15 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick(); refreshData(); } });
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("list").addEventListener("click", pick);
     $("list").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
@@ -377,6 +486,8 @@
       softenBasemap();
       buildField();
       buildMarkers();
+      state.base = state.hour = nowIndex();
+      buildTimeline();
       wire();
       readHash();
       render();
@@ -388,8 +499,7 @@
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
       DATA = d;
-      const gen = new Date(d.generated_utc.replace("Z", ":00Z"));
-      $("updated").textContent = `Updated ${gen.toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", hour: "numeric", minute: "2-digit" })} PT`;
+      showUpdated();
       start();
     })
     .catch((err) => { $("updated").textContent = `Couldn't load the forecast (${err.message}).`; });

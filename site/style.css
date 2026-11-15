@@ -178,18 +178,53 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .list .num { font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
 
 /* ---------- time bar ---------- */
+/* Big time label + buttons, then a slider whose bar is shaded day/night with hour ticks. */
 .timebar {
-  display: flex; align-items: center; gap: 8px; padding: 10px 16px; max-width: 100vw;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 18px;
+  padding: 10px 16px 8px; max-width: 100vw;
   background: var(--surface); box-shadow: 0 -1px 4px rgb(0 0 0 / .08); position: relative; z-index: 3;
+  --day: #ffe3a1; --night: #cbd5e3; --thumb: 24px;
 }
+@media (prefers-color-scheme: dark) { .timebar { --day: #6e5c2c; --night: #2c3847; } }
+.timehead { display: flex; align-items: center; gap: 8px; }
+.when { min-width: 170px; text-align: center; }
+.when .big { font-size: 19px; font-weight: 800; line-height: 1.15; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.when .big .live { color: var(--accent); }
 .round, .nowbtn {
   border: 0; background: var(--page); color: var(--ink); height: 38px; min-width: 38px;
   border-radius: 999px; cursor: pointer; font-weight: 800; font-size: 18px;
 }
 .nowbtn { padding: 0 16px; font-size: 14px; background: var(--accent); color: #fff; }
-.slider { flex: 1; min-width: 0; }
-.slider input { width: 100%; accent-color: var(--accent); }
-.timeinfo { font-size: 14px; }
+.nowbtn[aria-pressed="true"] { opacity: .55; }
+
+.slider { position: relative; height: 46px; }
+.slider .track {
+  position: absolute; top: 9px; height: 10px; border-radius: 5px;
+  left: calc(var(--thumb) / 2); right: calc(var(--thumb) / 2);
+}
+.slider input {
+  position: absolute; inset: 0 0 auto 0; width: 100%; height: 28px; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+.slider input::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+.slider input::-moz-range-track { height: 28px; background: transparent; }
+.slider input::-webkit-slider-thumb {
+  -webkit-appearance: none; width: var(--thumb); height: var(--thumb); margin-top: 2px; border-radius: 50%;
+  background: var(--accent); border: 3px solid #fff; box-shadow: var(--shadow);
+}
+.slider input::-moz-range-thumb {
+  width: var(--thumb); height: var(--thumb); border-radius: 50%; box-sizing: border-box;
+  background: var(--accent); border: 3px solid #fff; box-shadow: var(--shadow);
+}
+.slider input:focus-visible::-webkit-slider-thumb { outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.ticks { position: absolute; left: 0; right: 0; top: 26px; height: 18px; }
+.ticks span {
+  position: absolute; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap;
+}
+.ticks span.day { color: var(--ink-2); font-weight: 800; }
+.ticks span::before {
+  content: ""; position: absolute; left: 50%; top: -7px; width: 1px; height: 5px; background: var(--muted);
+}
 
 /* MapLibre controls, softened */
 .maplibregl-ctrl-group { border-radius: 14px !important; box-shadow: var(--shadow) !important; overflow: hidden; }
@@ -198,7 +233,9 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 @media (max-width: 760px) {
   html, body { height: auto; }
   .layout { flex: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: 62vh auto; }
-  .timebar { position: sticky; bottom: 0; z-index: 10; }
+  .timebar { position: sticky; bottom: 0; z-index: 10; grid-template-columns: minmax(0, 1fr); }
+  .timehead { justify-content: space-between; }
+  .when { flex: 1; min-width: 0; }
   .card { left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; }
   .legend { top: 8px; left: 8px; }
   /* Phones: smaller court icon; the label number stays a readable 11.5px. */

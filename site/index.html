@@ -44,13 +44,20 @@
   </main>
 
   <footer class="timebar">
-    <button id="prev" class="round" aria-label="Previous hour">‹</button>
-    <div class="slider">
-      <input type="range" id="hour" min="0" max="35" value="0" aria-label="Forecast hour">
-      <div class="timeinfo"><strong id="timeLabel">—</strong> <span id="dayLabel" class="muted"></span></div>
+    <div class="timehead">
+      <button id="prev" class="round" aria-label="Previous hour">‹</button>
+      <div class="when" aria-live="polite">
+        <div id="timeLabel" class="big">—</div>
+        <div id="dayLabel" class="muted small"></div>
+      </div>
+      <button id="next" class="round" aria-label="Next hour">›</button>
+      <button id="now" class="nowbtn">Now</button>
     </div>
-    <button id="next" class="round" aria-label="Next hour">›</button>
-    <button id="now" class="nowbtn">Now</button>
+    <div class="slider">
+      <div id="track" class="track" aria-hidden="true"></div>
+      <input type="range" id="hour" min="0" max="35" value="0" aria-label="Forecast hour">
+      <div id="ticks" class="ticks" aria-hidden="true"></div>
+    </div>
   </footer>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
