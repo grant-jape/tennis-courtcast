@@ -1,1 +1,1 @@
-"""IE CourtCast: court-by-court tennis weather for the Inland Empire."""
+"""Tennis CourtCast: court-by-court tennis weather for the Inland Empire."""

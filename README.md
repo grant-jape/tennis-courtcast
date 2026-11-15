@@ -1,8 +1,8 @@
-# IE CourtCast 🎾
+# Tennis CourtCast 🎾
 
 **Court-by-court tennis weather for the Inland Empire.** A map of every public court from Claremont to Fontana, colored by a 0–10 playability score, with wind and rain layers and a time slider for the next 36 hours.
 
-**Live map:** https://grant-jape.github.io/ie-courtcast/
+**Live map:** https://grant-jape.github.io/tennis-courtcast/
 
 Rain at Day Creek doesn't mean rain at Claremont. Fontana can be gusting 25 mph while Chino is calm. A single city forecast hides that. CourtCast pulls a forecast for every court and for a ~3 km grid across the region, so you can see where it's playable and when.
 
