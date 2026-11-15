@@ -42,8 +42,22 @@ WET_LAST_HOUR_PENALTY = 5.0   # it rained in the previous hour: courts still wet
 WET_2_3H_PENALTY = 2.5        # rained 2-3 hours ago: probably drying, puddles
 
 RAIN_CHANCE = dict(start=10, full=100, max_penalty=3.0)   # percent
-GUSTS = dict(start=12, full=35, max_penalty=6.0)          # mph
-WIND = dict(start=8, full=25, max_penalty=3.0)            # mph, sustained
+GUSTS = dict(start=12, full=32, max_penalty=7.0)          # mph
+WIND = dict(start=8, full=22, max_penalty=4.0)            # mph, sustained
+
+# --- Wind on its own (Wind view court colours, and a cap on the overall score) ---
+# From a drag simulation of a tennis ball (57.5 g, 6.7 cm, Cd ~0.55) in a crosswind:
+#   gust   serve toss pushed   rally ball pushed (60 mph shot)   lob pushed
+#   10 mph       0.2 m               0.7 m                          2.4 m
+#   15 mph       0.4 m               1.1 m                          3.7 m
+#   20 mph       0.7 m               1.5 m                          5.2 m
+#   25 mph       1.0 m               1.9 m (> a doubles alley)      6.8 m
+# Player/coach consensus: ~15 mph is tough but playable; 25+ is where most rec
+# players stop (the NWS calls 15-25 mph "breezy" and 25+ "windy").
+# Gusts count more than steady wind: a steady push you can aim for, a gust you can't.
+WIND_IFFY_GUST, WIND_SKIP_GUST = 15, 25          # mph
+WIND_IFFY_SUSTAINED, WIND_SKIP_SUSTAINED = 10, 18  # mph
+WIND_IFFY_CAP, WIND_SKIP_CAP = 6.9, 3.9          # overall score can't be greener than the wind allows
 HEAT = dict(start=88, full=108, max_penalty=4.0)          # F, rising
 COLD = dict(start=48, full=33, max_penalty=3.0)           # F, falling
 

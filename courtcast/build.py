@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import config as C
 from .openmeteo import fetch
-from .score import Hour, score_hour
+from .score import Hour, score_hour, wind_band
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -55,7 +55,7 @@ def series(result, start, hours):
     """Score each of `hours` hours from `start`; returns compact per-hour lists."""
     h = result["hourly"]
     v = lambda k, i: h[k][i] if h[k][i] is not None else 0.0  # noqa: E731
-    out = {k: [] for k in ("s", "b", "why", "t", "p", "r", "w", "g", "d")}
+    out = {k: [] for k in ("s", "b", "wb", "why", "t", "p", "r", "w", "g", "d")}
     for i in range(start, start + hours):
         hour = Hour(
             temp=v("temperature_2m", i),
@@ -69,6 +69,7 @@ def series(result, start, hours):
         s, b, why = score_hour(hour)
         out["s"].append(s)
         out["b"].append(b)
+        out["wb"].append(wind_band(hour.gust, hour.wind))   # wind-only rating for the Wind view
         out["why"].append(why)
         out["t"].append(round(hour.temp))
         out["p"].append(round(hour.rain_chance))
