@@ -20,7 +20,7 @@
 
   // hour = slider position (index into DATA.times); base = index of the real current hour.
   const state = { layer: "play", hour: 0, base: 0, schools: false, selected: null };
-  let DATA, map, markers = [], weather = [], PAL;
+  let DATA, map, markers = [], weather, PAL;
 
   // ---------- small helpers ----------
   const $ = (id) => document.getElementById(id);
@@ -116,65 +116,78 @@
     }
   }
 
-  // ---------- weather icons ----------
-  // Court colours already show playability, so the map only marks *where* the
-  // weather is: faded rain and wind icons sitting behind the courts. The ~3 km
-  // forecast cells are grouped 2x2 (~6 km areas) so icons don't crowd the map.
-  const RAIN_LIKELY = 40;   // % chance: show a plain cloud when rain is likely but none is forecast to fall
+  // ---------- weather shading: blue = rain, orange = wind, stripes = both ----------
+  // Court colours show playability; the shading shows *why* and *where*.
+  // The ~3 km forecast cells are blended smoothly (bilinear interpolation) into
+  // a soft overlay. Darker = heavier rain / stronger gusts. Where both happen,
+  // blue and orange alternate in diagonal stripes so neither colour gets lost
+  // (blending them would just make a muddy brown).
+  const RAIN_RGB = [47, 127, 224];
+  const WIND_RGB = [232, 140, 58];
+  const RAIN_LIKELY = 40;    // % chance: a faint blue tint when rain is likely but none is forecast
+  const SHOW = 0.12;         // intensity below this is treated as "none"
 
-  function wxSvg(kind, level) {
-    if (kind === "wind") {
-      return `<svg viewBox="0 0 32 32" class="wx-wind${level === 2 ? " strong" : ""}" aria-hidden="true">
-        <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
-          <path d="M4 12h15a3.5 3.5 0 1 0-3.4-4.4"/><path d="M4 17h21a3.5 3.5 0 1 1-3.4 4.4"/><path d="M4 22h10"/>
-        </g></svg>`;
-    }
-    // level 0 = cloud only (rain likely); 1-3 drops = sprinkle / rain / heavy rain
-    const xs = { 1: [16], 2: [12.5, 19.5], 3: [10, 16, 22] }[level] || [];
-    return `<svg viewBox="0 0 32 32" class="wx-rain${level ? "" : " cloud"}" aria-hidden="true">
-      <path d="M9.5 21a5.5 5.5 0 0 1 .6-11 7.5 7.5 0 0 1 14.3 1.6A4.7 4.7 0 0 1 23.7 21z" fill="currentColor"/>
-      <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round">${xs.map((x) => `<path d="M${x + 1} 23.5l-1.8 4.5"/>`).join("")}</g>
-    </svg>`;
-  }
-
-  const rainLevel = (inches, chance) =>
-    inches >= 0.1 ? 3 : inches >= 0.02 ? 2 : inches >= 0.002 ? 1 : chance >= RAIN_LIKELY ? 0 : -1;
-  const windLevel = (gust) => (gust >= DATA.bands.wind_skip ? 2 : gust >= DATA.bands.wind_iffy ? 1 : 0);
+  // 0..1 strength of each kind of weather at one grid cell.
+  const rainStrength = (inches, chance) =>
+    inches >= 0.002 ? 0.35 + 0.65 * clamp01(inches / 0.08) : chance >= RAIN_LIKELY ? 0.2 : 0;
+  const windStrength = (gust) =>
+    gust >= DATA.bands.wind_iffy ? 0.3 + 0.7 * clamp01((gust - DATA.bands.wind_iffy) / (DATA.bands.wind_skip - DATA.bands.wind_iffy)) : 0;
 
   function buildWeather() {
-    weather.forEach((w) => w.m.remove());
     const lats = [...new Set(DATA.grid.cells.map((c) => c.lat))].sort((a, b) => a - b);
     const lons = [...new Set(DATA.grid.cells.map((c) => c.lon))].sort((a, b) => a - b);
-    const groups = new Map();
-    DATA.grid.cells.forEach((c) => {
-      const key = `${Math.floor(lats.indexOf(c.lat) / 2)},${Math.floor(lons.indexOf(c.lon) / 2)}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(c);
-    });
-    weather = [...groups.values()].map((cells) => {
-      const el = document.createElement("div");
-      el.className = "wx";
-      el.style.zIndex = "1";                         // courts start at 10, so they're always in front
-      const lat = cells.reduce((s, c) => s + c.lat, 0) / cells.length;
-      const lon = cells.reduce((s, c) => s + c.lon, 0) / cells.length;
-      const m = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]).addTo(map);
-      return { cells, el, m };
-    });
+    const byKey = new Map(DATA.grid.cells.map((c) => [`${c.lat},${c.lon}`, c]));
+    const px = 24;                                    // canvas pixels per grid step
+    const W = (lons.length - 1) * px + 1, H = (lats.length - 1) * px + 1;
+    weather = {
+      lats, lons, W, H,
+      rows: lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`))),
+      canvas: Object.assign(document.createElement("canvas"), { width: W, height: H }),
+      coords: [[lons[0], lats.at(-1)], [lons.at(-1), lats.at(-1)], [lons.at(-1), lats[0]], [lons[0], lats[0]]],
+    };
   }
 
   function renderWeather() {
-    const h = state.hour;
-    weather.forEach(({ cells, el }) => {
-      const rain = Math.max(...cells.map((c) => c.r[h]));
-      const chance = Math.max(...cells.map((c) => c.p[h]));
-      const gust = Math.max(...cells.map((c) => c.g[h]));
-      const icons = [];
-      const rl = rainLevel(rain, chance), wl = windLevel(gust);
-      if (state.layer !== "wind" && rl >= 0) icons.push(wxSvg("rain", rl));
-      if (state.layer !== "rain" && wl) icons.push(wxSvg("wind", wl));
-      el.innerHTML = icons.join("");
-      el.style.display = icons.length ? "" : "none";
-    });
+    const { rows, W, H, canvas, lats, lons, coords } = weather;
+    const h = state.hour, nr = lats.length, nc = lons.length;
+    const showRain = state.layer !== "wind", showWind = state.layer !== "rain";
+    const rainV = rows.map((r) => r.map((c) => (showRain ? rainStrength(c.r[h], c.p[h]) : 0)));
+    const windV = rows.map((r) => r.map((c) => (showWind ? windStrength(c.g[h]) : 0)));
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(W, H);
+    const fadePx = W * 0.06;                          // soften the outer edge of the region
+    const stripe = 9;                                 // stripe width in canvas pixels (~0.4 km)
+    for (let y = 0; y < H; y++) {
+      const fy = ((H - 1 - y) / (H - 1)) * (nr - 1);
+      const r0 = Math.min(nr - 2, Math.floor(fy)), ty = fy - r0;
+      for (let x = 0; x < W; x++) {
+        const fx = (x / (W - 1)) * (nc - 1);
+        const c0 = Math.min(nc - 2, Math.floor(fx)), tx = fx - c0;
+        const lerp = (v) => v[r0][c0] * (1 - tx) * (1 - ty) + v[r0][c0 + 1] * tx * (1 - ty)
+                          + v[r0 + 1][c0] * (1 - tx) * ty + v[r0 + 1][c0 + 1] * tx * ty;
+        const rain = lerp(rainV), wind = lerp(windV);
+        let rgb, a;
+        if (rain >= SHOW && wind >= SHOW) {          // both: diagonal blue / orange stripes
+          const blue = Math.floor((x + y) / stripe) % 2 === 0;
+          rgb = blue ? RAIN_RGB : WIND_RGB;
+          a = blue ? rain : wind;
+        } else if (rain >= SHOW) { rgb = RAIN_RGB; a = rain; }
+        else if (wind >= SHOW) { rgb = WIND_RGB; a = wind; }
+        else continue;
+        const edge = clamp01(Math.min(x, W - 1 - x, y, H - 1 - y) / fadePx);
+        const i = (y * W + x) * 4;
+        img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2];
+        img.data[i + 3] = 255 * Math.min(0.55, a * 0.55) * edge;   // capped so courts stay in front
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const url = canvas.toDataURL();
+    const src = map.getSource("weather");
+    if (src) { src.updateImage({ url, coordinates: coords }); return; }
+    map.addSource("weather", { type: "image", url, coordinates: coords });
+    const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol");
+    map.addLayer({ id: "weather", type: "raster", source: "weather",
+      paint: { "raster-resampling": "linear", "raster-fade-duration": 0 } }, firstLabel && firstLabel.id);
   }
 
   // ---------- court markers ----------
@@ -294,19 +307,25 @@
   // ---------- legend + list ----------
   function renderLegend() {
     const B = DATA.bands;
-    const k = (svg, text) => `<span class="wxk">${svg}${text}</span>`;
+    const rgba = (c, a) => `rgb(${c.join(" ")} / ${a})`;
+    const sw = (bg, text) => `<span><b class="sw" style="background:${bg}"></b>${text}</span>`;
+    const rain = rgba(RAIN_RGB, 0.5), wind = rgba(WIND_RGB, 0.5);
+    const both = `repeating-linear-gradient(135deg, ${rain} 0 4px, ${wind} 4px 8px)`;
+    const ramp = (c) => `linear-gradient(90deg, ${rgba(c, 0.12)}, ${rgba(c, 0.55)})`;
     let html;
     if (state.layer === "play") {
       html = `<div class="title">Playability score</div>
         <div class="keys"><span><i style="background:${PAL.play}"></i>Play</span><span><i style="background:${PAL.iffy}"></i>Iffy</span><span><i style="background:${PAL.skip}"></i>Skip it</span></div>
-        <div class="keys">${k(wxSvg("rain", 1), "Rain")}${k(wxSvg("wind", 1), "Windy")}</div>`;
+        <div class="keys">${sw(rain, "Rain")}${sw(wind, "Wind")}${sw(both, "Both")}</div>`;
     } else if (state.layer === "wind") {
       html = `<div class="title">Wind gusts</div>
         <div class="keys"><span><i style="background:${PAL.play}"></i>0–${B.wind_iffy - 1}</span><span><i style="background:${PAL.iffy}"></i>${B.wind_iffy}–${B.wind_skip - 1}</span><span><i style="background:${PAL.skip}"></i>${B.wind_skip}+ mph</span></div>
-        <div class="keys">${k(wxSvg("wind", 1), `${B.wind_iffy}–${B.wind_skip - 1} mph`)}${k(wxSvg("wind", 2), `${B.wind_skip}+ mph`)}</div>`;
+        <div class="bar" style="background:${ramp(WIND_RGB)}"></div>
+        <div class="ends"><span>${B.wind_iffy} mph</span><span>${B.wind_skip}+ mph</span></div>`;
     } else {
       html = `<div class="title">Rain</div>
-        <div class="keys">${k(wxSvg("rain", 0), "Likely")}${k(wxSvg("rain", 1), "Sprinkle")}${k(wxSvg("rain", 2), "Rain")}${k(wxSvg("rain", 3), "Heavy")}</div>`;
+        <div class="bar" style="background:${ramp(RAIN_RGB)}"></div>
+        <div class="ends"><span>likely</span><span>sprinkle</span><span>heavy</span></div>`;
     }
     $("legend").innerHTML = html;
   }
