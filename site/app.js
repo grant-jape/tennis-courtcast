@@ -232,9 +232,25 @@
   // ---------- court card ----------
   function select(id) {
     state.selected = id;
+    render();   // draws the card first so we know how much map it covers
     const mk = markers.find((x) => x.ct.id === id);
-    if (mk) map.easeTo({ center: [mk.ct.lon, mk.ct.lat], zoom: Math.max(map.getZoom(), 12.5), duration: 600 });
+    if (!mk) return;
+    // Centre the court in the part of the map the card leaves visible:
+    // above the card on phones (full-width sheet), right of it on desktop.
+    const card = $("card"), wrap = map.getContainer();
+    const fullWidth = card.offsetWidth > wrap.offsetWidth * 0.7;
+    const padding = fullWidth
+      ? { top: 0, left: 0, right: 0, bottom: Math.min(card.offsetHeight + 12, wrap.offsetHeight * 0.7) }
+      : { top: 0, bottom: 0, right: 0, left: card.offsetWidth + 24 };
+    map.easeTo({ center: [mk.ct.lon, mk.ct.lat], zoom: Math.max(map.getZoom(), 12.5), padding, duration: 600 });
+  }
+
+  // MapLibre keeps camera padding until it's reset, so clear it when the card closes.
+  function closeCard() {
+    state.selected = null;
     render();
+    saveHash();
+    map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 300 });
   }
 
   function renderCard() {
@@ -262,7 +278,7 @@
       <div class="strip">${strip.join("")}</div>
       <div class="best">${bestWindow(ct, h)}</div>`;
     card.hidden = false;
-    card.querySelector(".x").addEventListener("click", () => { state.selected = null; render(); saveHash(); });
+    card.querySelector(".x").addEventListener("click", closeCard);
   }
 
   // Best 2-hour daylight window in the next 12 hours (average score).
@@ -452,7 +468,7 @@
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("list").addEventListener("click", pick);
     $("list").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
-    map.on("click", () => { if (state.selected) { state.selected = null; render(); saveHash(); } });
+    map.on("click", () => { if (state.selected) closeCard(); });
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
     map.on("zoom", names);
