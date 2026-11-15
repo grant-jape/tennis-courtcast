@@ -29,7 +29,7 @@ HOURLY_VARS = [
     "wind_direction_10m",
     "is_day",
 ]
-HOURS_AHEAD = 36            # how far ahead the map lets you scrub
+HOURS_AHEAD = 42            # data rebuilds every ~2 h, so this leaves >= 36 h ahead of the real clock
 LOCATIONS_PER_REQUEST = 50  # keeps request URLs a sane length
 
 # --- Playability score (0-10) -----------------------------------------------
