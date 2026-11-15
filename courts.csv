@@ -1,0 +1,59 @@
+id,name,city,type,lat,lon
+cypress-trails-park,Cypress Trails Park,Chino,park,34.00437,-117.6621
+olympic-park,Olympic Park,Chino,park,33.99344,-117.66544
+crossroads-park,Crossroads Park,Chino Hills,park,33.98106,-117.74257
+grand-avenue-park,Grand Avenue Park,Chino Hills,park,33.99273,-117.77461
+blaisdell-park,Blaisdell Park,Claremont,park,34.08756,-117.71415
+cahuilla-park,Cahuilla Park,Claremont,park,34.11447,-117.72416
+claremont-colleges-biszantz-tennis-center,Claremont Colleges – Biszantz Tennis Center,Claremont,college,34.0987,-117.70485
+mallows-park,Mallows Park,Claremont,park,34.09898,-117.71951
+memorial-park,Memorial Park,Claremont,park,34.10301,-117.71934
+pomona-college-pauley-courts,Pomona College – Pauley Courts,Claremont,college,34.09894,-117.7081
+pomona-college-south-campus-courts,Pomona College – South Campus Courts,Claremont,college,34.09523,-117.71166
+catawba-park,Catawba Park,Fontana,park,34.04569,-117.45837
+koehler-park,Koehler Park,Fontana,park,34.12969,-117.46965
+mcdermott-park,McDermott Park,Fontana,park,34.11948,-117.49865
+san-sevaine-park,San Sevaine Park,Fontana,park,34.15534,-117.48408
+southridge-park-don-day-tennis-courts,Southridge Park – Don Day Tennis Courts,Fontana,park,34.04004,-117.48515
+kaiser-park,Kaiser Park,Fontana,park,34.08055,-117.49044
+la-verne-sports-park,La Verne Sports Park,La Verne,park,34.10989,-117.76507
+live-oak-park,Live Oak Park,La Verne,park,34.13346,-117.7557
+hoffman-park,Hoffman Park,Montclair,park,34.07324,-117.69237
+creekside-park,Creekside Park,Ontario,park,34.02007,-117.58342
+james-r-bryant-park,James R Bryant Park,Ontario,park,34.06772,-117.65961
+john-galvin-park,John Galvin Park,Ontario,park,34.07744,-117.63158
+westwind-park,Westwind Park,Ontario,park,34.02033,-117.59886
+palomares-park,Palomares Park,Pomona,park,34.09339,-117.74327
+washington-park,Washington Park,Pomona,park,34.0484,-117.73911
+beryl-park,Beryl Park,Rancho Cucamonga,park,34.13568,-117.60833
+chaffey-college,Chaffey College,Rancho Cucamonga,college,34.14759,-117.56839
+day-creek-park,Day Creek Park,Rancho Cucamonga,park,34.14396,-117.53479
+lions-park,Lions Park,Rancho Cucamonga,park,34.12003,-117.6044
+alec-fergusson-park,Alec Fergusson Park,Rialto,park,34.15901,-117.42142
+bloomington-high-school,Bloomington High School,Bloomington,school,34.05883,-117.41609
+chino-high-school,Chino High School,Chino,school,34.02145,-117.6814
+don-antonio-lugo-high-school,Don Antonio Lugo High School,Chino,school,34.01114,-117.71587
+ramona-junior-high-school,Ramona Junior High School,Chino,school,34.02454,-117.70649
+ayala-high-school,Ayala High School,Chino Hills,school,33.99294,-117.73141
+greater-los-angeles,Greater Los Angeles,Claremont,school,34.1165,-117.7134
+a-b-miller-high-school,A.B. Miller High School,Fontana,school,34.13131,-117.44533
+almeria-middle-school,Almeria Middle School,Fontana,school,34.11271,-117.45789
+fontana-high-school,Fontana High School,Fontana,school,34.0809,-117.44973
+jurupa-hills-high-school,Jurupa Hills High School,Fontana,school,34.06089,-117.4497
+summit-high-school,Summit High School,Fontana,school,34.14629,-117.46522
+jurupa-valley-high-school,Jurupa Valley High School,Jurupa Valley,school,34.0026,-117.52265
+patriot-high-school,Patriot High School,Jurupa Valley,school,34.00787,-117.45214
+rubidoux-high-school,Rubidoux High School,Jurupa Valley,school,34.0016,-117.42595
+montclair-high-school,Montclair High School,Montclair,school,34.07338,-117.70452
+chaffey-high-school,Chaffey High School,Ontario,school,34.07916,-117.65789
+colony-high-school,Colony High School,Ontario,school,34.0148,-117.56966
+ontario-high-school,Ontario High School,Ontario,school,34.0377,-117.66603
+diamond-ranch-high-school,Diamond Ranch High School,Pomona,school,34.02314,-117.7753
+garey-high-school,Garey High School,Pomona,school,34.03767,-117.75009
+pomona-senior-high-school,Pomona Senior High School,Pomona,school,34.08558,-117.73873
+alta-loma-high-school,Alta Loma High School,Rancho Cucamonga,school,34.12311,-117.61047
+etiwanda-high-school,Etiwanda High School,Rancho Cucamonga,school,34.13112,-117.5102
+inland-empire,Inland Empire,Rancho Cucamonga,school,34.11124,-117.59059
+los-osos-high-school,Los Osos High School,Rancho Cucamonga,school,34.14573,-117.55567
+rancho-cucamonga-high-school,Rancho Cucamonga High School,Rancho Cucamonga,school,34.13039,-117.54594
+wilmer-amina-carter-high-school,Wilmer Amina Carter High School,Rialto,school,34.14484,-117.40264
