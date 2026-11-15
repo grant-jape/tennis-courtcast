@@ -125,7 +125,9 @@ def main(argv=None):
         "courts": [],
     }
     for c, res in zip(courts, court_res):
-        data["courts"].append({**{k: c[k] for k in ("id", "name", "city", "type", "lat", "lon")},
+        # status: "" (fine) / "poor" (playable but rough) / "closed" (not playable); note explains why.
+        data["courts"].append({**{k: c.get(k) or "" for k in ("id", "name", "city", "type", "status", "note")},
+                               "lat": c["lat"], "lon": c["lon"],
                                **series(res, start, hours)})
     for (la, lo), res in zip(grid, grid_res):
         ser = series(res, start, hours)
