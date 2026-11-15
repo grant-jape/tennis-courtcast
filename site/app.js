@@ -116,14 +116,15 @@
     }
   }
 
-  // ---------- weather shading: blue = rain, orange = wind, stripes = both ----------
+  // ---------- weather shading: blue = rain, orange = wind, purple = both ----------
   // Court colours show playability; the shading shows *why* and *where*.
   // The ~3 km forecast cells are blended smoothly (bilinear interpolation) into
-  // a soft overlay. Darker = heavier rain / stronger gusts. Where both happen,
-  // blue and orange alternate in diagonal stripes so neither colour gets lost
-  // (blending them would just make a muddy brown).
+  // a soft overlay. Darker = heavier rain / stronger gusts. Where both happen the
+  // area gets its own solid colour (purple, the group's pick), which reads more
+  // easily than stripes or a blend of blue and orange.
   const RAIN_RGB = [47, 127, 224];
   const WIND_RGB = [232, 140, 58];
+  const BOTH_RGB = [139, 92, 230];
   const RAIN_LIKELY = 40;    // % chance: a faint blue tint when rain is likely but none is forecast
   const SHOW = 0.12;         // intensity below this is treated as "none"
 
@@ -156,7 +157,6 @@
     const ctx = canvas.getContext("2d");
     const img = ctx.createImageData(W, H);
     const fadePx = W * 0.06;                          // soften the outer edge of the region
-    const stripe = 9;                                 // stripe width in canvas pixels (~0.4 km)
     for (let y = 0; y < H; y++) {
       const fy = ((H - 1 - y) / (H - 1)) * (nr - 1);
       const r0 = Math.min(nr - 2, Math.floor(fy)), ty = fy - r0;
@@ -167,11 +167,8 @@
                           + v[r0 + 1][c0] * (1 - tx) * ty + v[r0 + 1][c0 + 1] * tx * ty;
         const rain = lerp(rainV), wind = lerp(windV);
         let rgb, a;
-        if (rain >= SHOW && wind >= SHOW) {          // both: diagonal blue / orange stripes
-          const blue = Math.floor((x + y) / stripe) % 2 === 0;
-          rgb = blue ? RAIN_RGB : WIND_RGB;
-          a = blue ? rain : wind;
-        } else if (rain >= SHOW) { rgb = RAIN_RGB; a = rain; }
+        if (rain >= SHOW && wind >= SHOW) { rgb = BOTH_RGB; a = Math.max(rain, wind); }   // both
+        else if (rain >= SHOW) { rgb = RAIN_RGB; a = rain; }
         else if (wind >= SHOW) { rgb = WIND_RGB; a = wind; }
         else continue;
         const edge = clamp01(Math.min(x, W - 1 - x, y, H - 1 - y) / fadePx);
@@ -310,7 +307,7 @@
     const rgba = (c, a) => `rgb(${c.join(" ")} / ${a})`;
     const sw = (bg, text) => `<span><b class="sw" style="background:${bg}"></b>${text}</span>`;
     const rain = rgba(RAIN_RGB, 0.5), wind = rgba(WIND_RGB, 0.5);
-    const both = `repeating-linear-gradient(135deg, ${rain} 0 4px, ${wind} 4px 8px)`;
+    const both = rgba(BOTH_RGB, 0.5);
     const ramp = (c) => `linear-gradient(90deg, ${rgba(c, 0.12)}, ${rgba(c, 0.55)})`;
     let html;
     if (state.layer === "play") {
