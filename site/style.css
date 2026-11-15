@@ -8,6 +8,7 @@
   --line: #e7e3da;
   --accent: #2a78d6;
   --play: #0ca30c;
+  --okay: #6ea8dc;   /* "Okay" votes: calm blue, between green Great and amber Poor */
   --iffy: #fab219;
   --skip: #d03b3b;
   --play-soft: #e3f5e1;
@@ -171,31 +172,47 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 }
 .links a:hover { background: color-mix(in srgb, var(--accent) 12%, var(--page)); }
 
-/* Players' reviews, at the bottom of the court card. */
+/* Court condition votes + comments, at the bottom of the court card. */
 .community { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .community .ctitle { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-.community .reviews { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
-.community .reviews li { font-size: 13px; background: var(--page); border-radius: 10px; padding: 6px 10px; }
-.community .reviews li div { color: var(--ink-2); margin-top: 2px; overflow-wrap: anywhere; }
-.community .rate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
-@media (max-width: 760px) { .community .rate { grid-template-columns: repeat(2, 1fr); } }   /* 2 x 2 on phones */
-.community .rate button, .community .row button, .community .google {
-  border: 0; border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: 13px; cursor: pointer;
-  background: var(--page); color: var(--ink);
+/* Bar chart: label | bar (share of votes) | count. The whole row is the tap target. */
+.vbar {
+  display: grid; grid-template-columns: 112px 1fr 26px; align-items: center; gap: 8px; width: 100%;
+  border: 2px solid transparent; background: none; color: var(--ink); padding: 3px 6px; border-radius: 10px;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
-.community .rate button { flex: 1; }
-.community .rate button[aria-pressed="true"] { background: var(--accent); color: #fff; }
-.community textarea {
-  width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; resize: vertical;
-  background: var(--surface); color: var(--ink); font: inherit; font-size: 13px;
+.vbar:hover { background: var(--page); }
+.vbar.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.vbar .vl { font-weight: 700; white-space: nowrap; }
+.vbar .vt { height: 10px; border-radius: 5px; background: var(--page); overflow: hidden; }
+.vbar .vt i { display: block; height: 100%; border-radius: 5px; min-width: 0; }
+.vbar .vn { font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.vhint { margin: 2px 6px 0; }
+/* Comments, Instagram-style. */
+.comments { margin-top: 12px; }
+.comments ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 190px; overflow-y: auto; }
+.comments li, .comments .add { display: flex; gap: 8px; align-items: flex-start; }
+.comments .av {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-weight: 800; font-size: 13px;
 }
-.community .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.community .row .save, .community .google { background: var(--accent); color: #fff; }
-.community .google { width: 100%; }
-.community .who { margin-left: auto; }
-.community .who a { color: var(--accent); }
+.comments .cbody { font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.comments .cbody a { color: var(--muted); }
+.comments .empty { margin: 2px 0 6px; }
+.comments .add { margin-top: 10px; align-items: center; }
+.comments .add input {
+  flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px;
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.comments .add button { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 800; cursor: pointer; }
+.comments .add button:disabled { opacity: .5; }
+.community .google {
+  width: 100%; border: 0; border-radius: 999px; padding: 9px 12px; margin-top: 10px; cursor: pointer;
+  background: var(--accent); color: #fff; font: inherit; font-weight: 800; font-size: 13.5px;
+}
 .community .msg { margin-top: 4px; color: var(--ink-2); min-height: 1em; }
-.community .privacy { display: inline-block; margin-top: 2px; color: var(--muted); }
+.community .acct { margin-top: 6px; }
+.community .acct a { color: var(--muted); }
 /* The card can now be tall on phones; let it scroll instead of covering the whole map. */
 .card { max-height: calc(100% - 24px); overflow-y: auto; }
 .facts span { background: var(--page); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
