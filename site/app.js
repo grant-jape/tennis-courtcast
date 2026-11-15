@@ -172,7 +172,7 @@
       el.tabIndex = 0;
       el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); });
       el.addEventListener("keydown", (e) => { if (e.key === "Enter") select(ct.id); });
-      const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -17] }).setLngLat([ct.lon, ct.lat]);
+      const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -12] }).setLngLat([ct.lon, ct.lat]);
       markers.push({ ct, el, m, shown: false });
     });
   }
@@ -202,7 +202,8 @@
       const b = ct.b[h];
       el.classList.toggle("selected", state.selected === ct.id);
       el.setAttribute("aria-label", `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10`);
-      el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b, chipValue(ct, h))}</div><div class="nm">${ct.name}</div>`;
+      // Small court icon with the number beside it, always visible at every zoom.
+      el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b)}<span class="val">${chipValue(ct, h)}</span></div><div class="nm">${ct.name}</div>`;
       el.style.zIndex = String(Math.round(notability(ct, h)));
       if (!mk.shown) { m.addTo(map); mk.shown = true; }
     });

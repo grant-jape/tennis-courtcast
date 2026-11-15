@@ -53,6 +53,12 @@ jobs:
             git push
           fi
 
+      - name: Stamp asset links with the commit, so phones fetch fresh code after each update
+        run: |
+          v="${GITHUB_SHA::7}"
+          sed -i "s|href=\"style.css\"|href=\"style.css?v=$v\"|; s|src=\"app.js\"|src=\"app.js?v=$v\"|" site/index.html
+          grep -o 'style.css?v=[0-9a-f]*\|app.js?v=[0-9a-f]*' site/index.html
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
