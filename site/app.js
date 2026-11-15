@@ -71,6 +71,10 @@
     temp: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.4V3a1.5 1.5 0 0 1 3 0v6.4a3 3 0 1 1-3 0z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8" cy="11.8" r="1.2" fill="currentColor"/></svg>',
   };
 
+  // Tiny day/night markers for the card's hour strip.
+  const SUN = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M3.2 12.8l1.1-1.1M11.7 4.3l1.1-1.1"/></g></svg>';
+  const MOON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.8 2.2a6 6 0 1 0 3 9.6 5 5 0 0 1-3-9.6z" fill="currentColor"/></svg>';
+
   // A top-down tennis court, coloured by how playable it is (green / amber / red).
   function courtSvg(band) {
     return `<svg class="court" viewBox="0 0 30 18" aria-hidden="true">
@@ -261,7 +265,9 @@
     const why = ct.why[h].length ? ct.why[h].join(" · ") : "Nothing in the way";
     const strip = [];
     for (let i = h; i < Math.min(h + 12, DATA.times.length); i++) {
-      strip.push(`<div><i class="${ct.b[i]}${DATA.is_day[i] ? "" : " night"}" title="${fmtTime(DATA.times[i])}: ${ct.s[i]}"></i>${fmtTime(DATA.times[i], true)}</div>`);
+      // Sun or moon above each hour; the block keeps its playability colour either way.
+      const day = DATA.is_day[i];
+      strip.push(`<div><span class="dn ${day ? "sun" : "moon"}" title="${day ? "Daylight" : "After dark"}">${day ? SUN : MOON}</span><i class="${ct.b[i]}" title="${fmtTime(DATA.times[i])}: ${ct.s[i]}"></i>${fmtTime(DATA.times[i], true)}</div>`);
     }
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
@@ -274,7 +280,7 @@
         <span>${ICON.wind} ${ct.w[h]} mph, gusts ${ct.g[h]} · from ${compass(ct.d[h])}</span>
         <span>${ICON.rain} ${ct.p[h]}% chance${ct.r[h] > 0 ? ` · ${ct.r[h]}″` : ""}</span>
       </div>
-      <div class="muted small">Next 12 hours (faded = after dark)</div>
+      <div class="muted small">Next 12 hours</div>
       <div class="strip">${strip.join("")}</div>
       <div class="best">${bestWindow(ct, h)}</div>`;
     card.hidden = false;

@@ -161,7 +161,10 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .strip div { text-align: center; font-size: 10.5px; color: var(--muted); font-weight: 700; }
 .strip i { display: block; height: 18px; border-radius: 5px; margin-bottom: 3px; }
 .strip i.play { background: var(--play); } .strip i.iffy { background: var(--iffy); } .strip i.skip { background: var(--skip); }
-.strip i.night { opacity: .4; }
+.strip .dn { display: block; height: 14px; margin-bottom: 2px; }
+.strip .dn svg { width: 13px; height: 13px; display: inline-block; }
+.strip .dn.sun { color: #f2a900; }
+.strip .dn.moon { color: #7c8da3; }
 .best { margin-top: 10px; font-weight: 800; color: var(--ink); }
 
 /* ---------- list ---------- */
