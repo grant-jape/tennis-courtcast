@@ -99,7 +99,7 @@
   const mapsUrl = (ct) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ct.name}, ${ct.city}, CA`)}`;
   const streetUrl = (ct) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ct.lat},${ct.lon}`;
 
-  // ---------- players' reviews (Supabase: Google sign-in + great / okay / poor + comment) ----------
+  // ---------- court votes + comments (Supabase: Google sign-in) ----------
   // The publishable key is public by design. The database's row-level security decides who can
   // do what: everyone can read reviews; a signed-in player can only add, edit or delete their own,
   // and the database (not the browser) stamps who wrote it and their first name.
@@ -116,7 +116,7 @@
   const sb = window.supabase
     ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true } })
     : null;
-  const community = { user: null, googleReady: false, summary: new Map(), reviews: new Map(), loading: new Set() };
+  const community = { user: null, googleReady: false, summary: new Map(), comments: new Map(), myVote: new Map(), loading: new Set() };
   const RATING = {
     great: { label: "Great", face: "👍" },
     okay: { label: "Okay", face: "👌" },
@@ -163,86 +163,137 @@
     community.user = (data.session && data.session.user) || null;
     sb.auth.onAuthStateChange((_event, session) => {
       community.user = (session && session.user) || null;
+      community.comments.clear(); community.myVote.clear();   // reload with the new player's own vote
       renderCard();
     });
     await loadSummary();
   }
   async function loadSummary() {
-    const { data, error } = await sb.from("court_review_summary").select("*");
+    const { data, error } = await sb.from("court_vote_summary").select("*");
     if (error) return;
     community.summary = new Map(data.map((r) => [r.court_id, r]));
     render();
   }
-  async function loadReviews(courtId, force) {
-    if (!sb || community.loading.has(courtId) || (!force && community.reviews.has(courtId))) return;
+  // One court's comments, plus the signed-in player's own vote there.
+  async function loadCourt(courtId, force) {
+    if (!sb || community.loading.has(courtId) || (!force && community.comments.has(courtId))) return;
     community.loading.add(courtId);
-    const { data } = await sb.from("reviews").select("user_id,user_name,rating,comment,updated_at")
-      .eq("court_id", courtId).order("updated_at", { ascending: false }).limit(25);
+    const [comments, mine] = await Promise.all([
+      sb.from("court_comments").select("id,user_id,user_name,body,created_at")
+        .eq("court_id", courtId).order("created_at", { ascending: true }).limit(100),
+      community.user
+        ? sb.from("court_votes").select("rating").eq("court_id", courtId).eq("user_id", community.user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
     community.loading.delete(courtId);
-    community.reviews.set(courtId, data || []);
+    community.comments.set(courtId, comments.data || []);
+    community.myVote.set(courtId, (mine.data && mine.data.rating) || null);
     if (state.selected === courtId) renderCard();
+  }
+  function signIn() {
+    try { sessionStorage.setItem("cc-return", location.hash); } catch (_) { /* fine */ }
+    return sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
+  }
+
+  // Court condition: a horizontal bar per choice, length = share of the votes (last 90 days).
+  // Colours carry meaning (green good ... red not playable), and every bar is also labelled.
+  const VOTE_COLOR = { great: "var(--play)", okay: "var(--okay)", poor: "var(--iffy)", unplayable: "var(--skip)" };
+  function votesHtml(ct) {
+    const s = community.summary.get(ct.id) || {};
+    const total = Object.keys(RATING).reduce((a, k) => a + (s[k] || 0), 0);
+    const mine = community.myVote.get(ct.id);
+    const rows = Object.entries(RATING).map(([k, v]) => {
+      const n = s[k] || 0;
+      const pct = total ? Math.round((n / total) * 100) : 0;
+      return `<button class="vbar${mine === k ? " mine" : ""}" data-vote="${k}" aria-pressed="${mine === k}"
+          aria-label="${v.label}: ${n} vote${n === 1 ? "" : "s"}${mine === k ? ", your vote" : ""}">
+        <span class="vl">${v.face} ${v.label}</span>
+        <span class="vt"><i style="width:${pct}%;background:${VOTE_COLOR[k]}"></i></span>
+        <span class="vn">${n}</span></button>`;
+    }).join("");
+    const hint = community.user ? (mine ? "Tap a bar to change your vote · tap yours again to remove it" : "Tap a bar to vote")
+      : community.googleReady ? "Sign in to vote" : "";
+    return `<div class="votes"><div class="ctitle"><strong>Court condition</strong>
+        <span class="muted small">${total} vote${total === 1 ? "" : "s"} · last 90 days</span></div>
+      ${rows}${hint ? `<div class="muted small vhint">${hint}</div>` : ""}</div>`;
+  }
+
+  // Comments, Instagram-style: initial, bold name, text, time; add one at the bottom.
+  const avatar = (name) => `<span class="av" aria-hidden="true">${esc(((name || "?").trim()[0] || "?").toUpperCase())}</span>`;
+  function commentsHtml(ct) {
+    const list = community.comments.get(ct.id);
+    const me = community.user;
+    const items = (list || []).map((c) => `<li>${avatar(c.user_name)}<div class="cbody">
+        <b>${esc(c.user_name || "Player")}</b> ${esc(c.body)}
+        <div class="muted small">${ago(c.created_at)}${me && c.user_id === me.id ? ` · <a href="#" data-del="${esc(c.id)}">Delete</a>` : ""}</div>
+      </div></li>`).join("");
+    const add = me ? `<form class="add" data-act="comment">${avatar(firstName(me))}
+        <input name="body" maxlength="300" placeholder="Add a comment…" autocomplete="off" aria-label="Add a comment">
+        <button type="submit">Post</button></form>` : "";
+    return `<div class="comments"><div class="ctitle"><strong>Comments</strong>
+        <span class="muted small">${list && list.length ? list.length : ""}</span></div>
+      ${list ? (items ? `<ul>${items}</ul>` : '<div class="muted small empty">No comments yet. Nets, cracks, lights, crowds?</div>')
+        : '<div class="muted small empty">Loading…</div>'}
+      ${add}</div>`;
   }
 
   function communityHtml(ct) {
     if (!sb) return "";
-    const list = community.reviews.get(ct.id);
-    const s = community.summary.get(ct.id);
-    const me = community.user && list ? list.find((r) => r.user_id === community.user.id) : null;
-    const tally = s ? Object.entries(RATING).filter(([k]) => s[k]).map(([k, v]) => `${v.face} ${v.label} ${s[k]}`).join(" · ") : "No reviews yet";
-    let form;
-    if (!community.user) {
-      form = community.googleReady
-        ? `<button class="google" data-act="signin">Sign in with Google to review</button>`
-        : `<div class="muted small">Reviewing with Google sign-in is coming soon.</div>`;
-    } else {
-      form = `<div class="rate" role="group" aria-label="Your rating">${Object.entries(RATING).map(([k, v]) =>
-          `<button data-rate="${k}" aria-pressed="${me && me.rating === k}">${v.face} ${v.label}</button>`).join("")}</div>
-        <textarea maxlength="300" rows="2" placeholder="Optional comment: nets, cracks, lights, crowds…">${esc(me ? me.comment : "")}</textarea>
-        <div class="row"><button class="save" data-act="save">${me ? "Update review" : "Post review"}</button>
-          ${me ? '<button class="ghost" data-act="delete">Delete</button>' : ""}
-          <span class="muted small who">as ${esc(firstName(community.user))} · <a href="#" data-act="signout">Sign out</a></span></div>`;
-    }
-    const items = (list || []).slice(0, 5).map((r) => `<li><b>${esc(r.user_name || "Player")}</b> ${RATING[r.rating].face} ${RATING[r.rating].label}
-      <span class="muted small">· ${ago(r.updated_at)}</span>${r.comment ? `<div>${esc(r.comment)}</div>` : ""}</li>`).join("");
-    return `<div class="community"><div class="ctitle"><strong>Players' reviews</strong><span class="muted small">${tally}</span></div>
-      ${list ? (items ? `<ul class="reviews">${items}</ul>` : "") : '<div class="muted small">Loading reviews…</div>'}
-      ${form}<div class="msg small" aria-live="polite"></div>
-      <a class="privacy small" href="privacy.html">Privacy</a></div>`;
+    const account = community.user
+      ? `<div class="muted small acct">Signed in as ${esc(firstName(community.user))} · <a href="#" data-act="signout">Sign out</a> · <a href="privacy.html">Privacy</a></div>`
+      : community.googleReady
+        ? `<button class="google" data-act="signin">Sign in with Google to vote and comment</button>
+           <div class="muted small acct"><a href="privacy.html">Privacy</a></div>`
+        : `<div class="muted small acct">Voting and comments with Google sign-in are coming soon · <a href="privacy.html">Privacy</a></div>`;
+    return `<div class="community">${votesHtml(ct)}${commentsHtml(ct)}<div class="msg small" aria-live="polite"></div>${account}</div>`;
   }
 
   async function onCommunityClick(e) {
-    const t = e.target.closest("[data-act], [data-rate]");
-    if (!t || !sb) return;
+    const t = e.target.closest("[data-act], [data-vote], [data-del]");
+    if (!t || !sb || t.tagName === "FORM") return;
     e.preventDefault();
     const box = t.closest(".community"), msg = box && box.querySelector(".msg");
     const say = (text) => { if (msg) msg.textContent = text; };
     const courtId = state.selected;
-    if (t.dataset.rate) {   // pick a rating (just highlights the button until you save)
-      box.querySelectorAll("[data-rate]").forEach((b) => b.setAttribute("aria-pressed", String(b === t)));
-      return;
-    }
-    if (t.dataset.act === "signin") {
-      try { sessionStorage.setItem("cc-return", location.hash); } catch (_) { /* fine */ }
-      await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
+    if (t.dataset.vote) {
+      if (!community.user) { if (community.googleReady) await signIn(); else say("Voting opens soon."); return; }
+      const k = t.dataset.vote, prev = community.myVote.get(courtId);
+      const { error } = prev === k   // tapping your current vote again removes it
+        ? await sb.from("court_votes").delete().eq("court_id", courtId).eq("user_id", community.user.id)
+        : await sb.from("court_votes").upsert({ court_id: courtId, rating: k }, { onConflict: "court_id,user_id" });
+      if (error) { say(`Couldn't save your vote: ${error.message}`); return; }
+      community.myVote.set(courtId, prev === k ? null : k);
+      await loadSummary();
+    } else if (t.dataset.del) {
+      const { error } = await sb.from("court_comments").delete().eq("id", t.dataset.del);
+      if (error) { say(`Couldn't delete: ${error.message}`); return; }
+      await loadCourt(courtId, true);
+    } else if (t.dataset.act === "signin") {
+      await signIn();
     } else if (t.dataset.act === "signout") {
       await sb.auth.signOut();
-    } else if (t.dataset.act === "save") {
-      const picked = box.querySelector('[data-rate][aria-pressed="true"]');
-      if (!picked) { say("Pick Great, Okay, Poor or Not playable first."); return; }
-      const comment = box.querySelector("textarea").value.trim().slice(0, 300) || null;
-      say("Saving…");
-      const { error } = await sb.from("reviews")
-        .upsert({ court_id: courtId, rating: picked.dataset.rate, comment }, { onConflict: "court_id,user_id" });
-      if (error) { say(`Couldn't save: ${error.message}`); return; }
-      await loadReviews(courtId, true);
-      await loadSummary();
-      say("Thanks, your review is saved.");
-    } else if (t.dataset.act === "delete") {
-      const { error } = await sb.from("reviews").delete().eq("court_id", courtId).eq("user_id", community.user.id);
-      if (error) { say(`Couldn't delete: ${error.message}`); return; }
-      await loadReviews(courtId, true);
-      await loadSummary();
     }
+  }
+
+  async function onCommentSubmit(e) {
+    const form = e.target.closest('form[data-act="comment"]');
+    if (!form || !sb) return;
+    e.preventDefault();
+    const input = form.querySelector("input"), button = form.querySelector("button");
+    const body = input.value.trim().slice(0, 300);
+    if (!body) return;
+    button.disabled = true;
+    const { error } = await sb.from("court_comments").insert({ court_id: state.selected, body });
+    button.disabled = false;
+    if (error) {
+      const msg = form.closest(".community").querySelector(".msg");
+      if (msg) msg.textContent = `Couldn't post: ${error.message}`;
+      return;
+    }
+    input.value = "";
+    await loadCourt(state.selected, true);
+    const ul = $("card").querySelector(".comments ul");
+    if (ul) ul.scrollTop = ul.scrollHeight;   // show the new comment
   }
 
   // ---------- basemap softening ----------
@@ -437,10 +488,8 @@
     const banner = st ? `<div class="status ${st.cls}"><b>${st.badge} ${st.label}</b>${ct.effNote ? ` · ${esc(ct.effNote)}` : ""}</div>` : "";
     // The card is rebuilt when the time or view changes; keep a half-written review.
     const prev = card.dataset.court === ct.id && card.querySelector(".community");
-    const draft = prev && {
-      text: prev.querySelector("textarea") && prev.querySelector("textarea").value,
-      rate: (prev.querySelector('[data-rate][aria-pressed="true"]') || {}).dataset,
-    };
+    const typing = prev && prev.querySelector('form[data-act="comment"] input');
+    const draft = typing && typing.value ? { text: typing.value, focused: document.activeElement === typing } : null;
     card.dataset.court = ct.id;
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
@@ -469,14 +518,11 @@
       ${communityHtml(ct)}`;
     card.hidden = false;
     card.querySelector(".x").addEventListener("click", closeCard);
-    if (draft) {
-      const ta = card.querySelector(".community textarea");
-      if (ta && draft.text != null) ta.value = draft.text;
-      if (draft.rate && draft.rate.rate) {
-        card.querySelectorAll(".community [data-rate]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rate === draft.rate.rate)));
-      }
+    if (draft) {   // the card was rebuilt mid-comment: put the half-typed comment back
+      const input = card.querySelector('form[data-act="comment"] input');
+      if (input) { input.value = draft.text; if (draft.focused) input.focus(); }
     }
-    loadReviews(ct.id);
+    loadCourt(ct.id);
   }
 
   // Best 2-hour daylight window in the next 12 hours (average score).
@@ -671,7 +717,8 @@
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick(); refreshData(); } });
-    $("card").addEventListener("click", onCommunityClick);   // rate / save / sign in, inside the court card
+    $("card").addEventListener("click", onCommunityClick);    // vote / delete / sign in, inside the court card
+    $("card").addEventListener("submit", onCommentSubmit);    // post a comment
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("list").addEventListener("click", pick);
     $("list").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
