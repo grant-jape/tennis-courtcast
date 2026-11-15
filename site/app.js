@@ -99,6 +99,151 @@
   const mapsUrl = (ct) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ct.name}, ${ct.city}, CA`)}`;
   const streetUrl = (ct) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ct.lat},${ct.lon}`;
 
+  // ---------- players' reviews (Supabase: Google sign-in + great / okay / poor + comment) ----------
+  // The publishable key is public by design. The database's row-level security decides who can
+  // do what: everyone can read reviews; a signed-in player can only add, edit or delete their own,
+  // and the database (not the browser) stamps who wrote it and their first name.
+  const SB_URL = "https://bbdfrjgzuopnowrpetgh.supabase.co";
+  const SB_KEY = "sb_publishable_1XK4mRoUxl2Ey5GzxX4nUQ_6RHTUsk3";
+  // After Google sign-in we come back with ?code=…; put the map back where the player was.
+  try {
+    const back = sessionStorage.getItem("cc-return");
+    if (back !== null && /[?&]code=/.test(location.search)) {
+      history.replaceState(null, "", location.pathname + location.search + back);
+      sessionStorage.removeItem("cc-return");
+    }
+  } catch (_) { /* storage blocked: just land on the default view */ }
+  const sb = window.supabase
+    ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true } })
+    : null;
+  const community = { user: null, googleReady: false, summary: new Map(), reviews: new Map(), loading: new Set() };
+  const RATING = {
+    great: { label: "Great", face: "👍" },
+    okay: { label: "Okay", face: "👌" },
+    poor: { label: "Poor", face: "👎" },
+    unplayable: { label: "Not playable", face: "🚫" },
+  };
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const firstName = (u) => ((u && u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || "you").split(" ")[0];
+  function ago(ts) {
+    const m = Math.round((Date.now() - new Date(ts)) / 60000);
+    if (m < 2) return "just now";
+    if (m < 60) return `${m}m ago`;
+    if (m < 48 * 60) return `${Math.round(m / 60)}h ago`;
+    return `${Math.round(m / 1440)}d ago`;
+  }
+
+  // A court the group hasn't marked in courts.csv still gets flagged from recent reviews
+  // (last 90 days), when at least two players agree and they outnumber everyone else:
+  //   "Not playable" reviews  -> not playable (gray ✕)
+  //   "Poor" + "Not playable" -> rough court (⚠)
+  function applyStatuses() {
+    DATA.courts.forEach((c) => {
+      const s = community.summary.get(c.id);
+      const n = (k) => (s && s[k]) || 0;
+      const good = n("great") + n("okay");
+      let crowd = "", note = "";
+      if (n("unplayable") >= 2 && n("unplayable") > good + n("poor")) {
+        crowd = "closed"; note = `${n("unplayable")} players said it's not playable recently`;
+      } else if (n("poor") + n("unplayable") >= 2 && n("poor") + n("unplayable") > good) {
+        crowd = "poor"; note = `${n("poor") + n("unplayable")} players rated it poor or not playable recently`;
+      }
+      c.eff = c.status || crowd;
+      c.effNote = c.status ? c.note : note;
+    });
+  }
+
+  async function initCommunity() {
+    if (!sb) return;
+    try {   // Sign-in only appears once Google is switched on in Supabase (no code change needed).
+      const r = await fetch(`${SB_URL}/auth/v1/settings`, { headers: { apikey: SB_KEY } });
+      community.googleReady = !!((await r.json()).external || {}).google;
+    } catch (_) { /* offline: reviews stay read-only */ }
+    const { data } = await sb.auth.getSession();
+    community.user = (data.session && data.session.user) || null;
+    sb.auth.onAuthStateChange((_event, session) => {
+      community.user = (session && session.user) || null;
+      renderCard();
+    });
+    await loadSummary();
+  }
+  async function loadSummary() {
+    const { data, error } = await sb.from("court_review_summary").select("*");
+    if (error) return;
+    community.summary = new Map(data.map((r) => [r.court_id, r]));
+    render();
+  }
+  async function loadReviews(courtId, force) {
+    if (!sb || community.loading.has(courtId) || (!force && community.reviews.has(courtId))) return;
+    community.loading.add(courtId);
+    const { data } = await sb.from("reviews").select("user_id,user_name,rating,comment,updated_at")
+      .eq("court_id", courtId).order("updated_at", { ascending: false }).limit(25);
+    community.loading.delete(courtId);
+    community.reviews.set(courtId, data || []);
+    if (state.selected === courtId) renderCard();
+  }
+
+  function communityHtml(ct) {
+    if (!sb) return "";
+    const list = community.reviews.get(ct.id);
+    const s = community.summary.get(ct.id);
+    const me = community.user && list ? list.find((r) => r.user_id === community.user.id) : null;
+    const tally = s ? Object.entries(RATING).filter(([k]) => s[k]).map(([k, v]) => `${v.face} ${v.label} ${s[k]}`).join(" · ") : "No reviews yet";
+    let form;
+    if (!community.user) {
+      form = community.googleReady
+        ? `<button class="google" data-act="signin">Sign in with Google to review</button>`
+        : `<div class="muted small">Reviewing with Google sign-in is coming soon.</div>`;
+    } else {
+      form = `<div class="rate" role="group" aria-label="Your rating">${Object.entries(RATING).map(([k, v]) =>
+          `<button data-rate="${k}" aria-pressed="${me && me.rating === k}">${v.face} ${v.label}</button>`).join("")}</div>
+        <textarea maxlength="300" rows="2" placeholder="Optional comment: nets, cracks, lights, crowds…">${esc(me ? me.comment : "")}</textarea>
+        <div class="row"><button class="save" data-act="save">${me ? "Update review" : "Post review"}</button>
+          ${me ? '<button class="ghost" data-act="delete">Delete</button>' : ""}
+          <span class="muted small who">as ${esc(firstName(community.user))} · <a href="#" data-act="signout">Sign out</a></span></div>`;
+    }
+    const items = (list || []).slice(0, 5).map((r) => `<li><b>${esc(r.user_name || "Player")}</b> ${RATING[r.rating].face} ${RATING[r.rating].label}
+      <span class="muted small">· ${ago(r.updated_at)}</span>${r.comment ? `<div>${esc(r.comment)}</div>` : ""}</li>`).join("");
+    return `<div class="community"><div class="ctitle"><strong>Players' reviews</strong><span class="muted small">${tally}</span></div>
+      ${list ? (items ? `<ul class="reviews">${items}</ul>` : "") : '<div class="muted small">Loading reviews…</div>'}
+      ${form}<div class="msg small" aria-live="polite"></div></div>`;
+  }
+
+  async function onCommunityClick(e) {
+    const t = e.target.closest("[data-act], [data-rate]");
+    if (!t || !sb) return;
+    e.preventDefault();
+    const box = t.closest(".community"), msg = box && box.querySelector(".msg");
+    const say = (text) => { if (msg) msg.textContent = text; };
+    const courtId = state.selected;
+    if (t.dataset.rate) {   // pick a rating (just highlights the button until you save)
+      box.querySelectorAll("[data-rate]").forEach((b) => b.setAttribute("aria-pressed", String(b === t)));
+      return;
+    }
+    if (t.dataset.act === "signin") {
+      try { sessionStorage.setItem("cc-return", location.hash); } catch (_) { /* fine */ }
+      await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
+    } else if (t.dataset.act === "signout") {
+      await sb.auth.signOut();
+    } else if (t.dataset.act === "save") {
+      const picked = box.querySelector('[data-rate][aria-pressed="true"]');
+      if (!picked) { say("Pick Great, Okay, Poor or Not playable first."); return; }
+      const comment = box.querySelector("textarea").value.trim().slice(0, 300) || null;
+      say("Saving…");
+      const { error } = await sb.from("reviews")
+        .upsert({ court_id: courtId, rating: picked.dataset.rate, comment }, { onConflict: "court_id,user_id" });
+      if (error) { say(`Couldn't save: ${error.message}`); return; }
+      await loadReviews(courtId, true);
+      await loadSummary();
+      say("Thanks, your review is saved.");
+    } else if (t.dataset.act === "delete") {
+      const { error } = await sb.from("reviews").delete().eq("court_id", courtId).eq("user_id", community.user.id);
+      if (error) { say(`Couldn't delete: ${error.message}`); return; }
+      await loadReviews(courtId, true);
+      await loadSummary();
+    }
+  }
+
   // ---------- basemap softening ----------
   function softenBasemap() {
     const B = BASEMAP;
@@ -214,8 +359,8 @@
 
   // The label under each court: score, gusts, or rain (amount if any, else chance).
   function chipValue(ct, h) {
-    if (ct.status === "closed") return "Closed";
-    const warn = ct.status === "poor" ? "⚠ " : "";
+    if (ct.eff === "closed") return "Closed";
+    const warn = ct.eff === "poor" ? "⚠ " : "";
     if (state.layer === "wind") return `${warn}${ct.g[h]} mph`;
     if (state.layer === "rain") return warn + (ct.r[h] > 0 ? `${ct.r[h].toFixed(2)} in` : `${ct.p[h]}%`);
     return warn + (ct.s[h] >= 10 ? "10" : ct.s[h].toFixed(1));
@@ -224,7 +369,7 @@
   // How notable a court is for the current view; higher sits on top when markers overlap.
   function notability(ct, h) {
     if (ct.id === state.selected) return 1e6;
-    if (ct.status === "closed") return 0;                 // closed courts sink under the others
+    if (ct.eff === "closed") return 0;                 // closed courts sink under the others
     const school = ct.type === "school" ? 0 : 1e5;
     if (state.layer === "wind") return school + ct.g[h];
     if (state.layer === "rain") return school + ct.r[h] * 1000 + ct.p[h];
@@ -239,10 +384,10 @@
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
       // A closed court is gray with a ✕ whatever the weather.
-      const b = ct.status === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
+      const b = ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
       el.classList.toggle("selected", state.selected === ct.id);
-      el.setAttribute("aria-label", ct.status === "closed" ? `${ct.name}: not playable` :
-        `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.status === "poor" ? ", rough court" : ""}`);
+      el.setAttribute("aria-label", ct.eff === "closed" ? `${ct.name}: not playable` :
+        `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.eff === "poor" ? ", rough court" : ""}`);
       // Small court icon with the number beside it, always visible at every zoom.
       // Court icon (coloured by playability) on top; the number on a white label underneath.
       el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b)}</div><div class="lbl">${chipValue(ct, h)}</div><div class="nm">${ct.name}</div>`;
@@ -287,17 +432,24 @@
       const day = DATA.is_day[i];
       strip.push(`<div><span class="dn ${day ? "sun" : "moon"}" title="${day ? "Daylight" : "After dark"}">${day ? SUN : MOON}</span><i class="${ct.b[i]}" title="${fmtTime(DATA.times[i])}: ${ct.s[i]}"></i>${fmtTime(DATA.times[i], true)}</div>`);
     }
-    const st = STATUS[ct.status];
-    const banner = st ? `<div class="status ${st.cls}"><b>${st.badge} ${st.label}</b>${ct.note ? ` · ${ct.note}` : ""}</div>` : "";
+    const st = STATUS[ct.eff];
+    const banner = st ? `<div class="status ${st.cls}"><b>${st.badge} ${st.label}</b>${ct.effNote ? ` · ${esc(ct.effNote)}` : ""}</div>` : "";
+    // The card is rebuilt when the time or view changes; keep a half-written review.
+    const prev = card.dataset.court === ct.id && card.querySelector(".community");
+    const draft = prev && {
+      text: prev.querySelector("textarea") && prev.querySelector("textarea").value,
+      rate: (prev.querySelector('[data-rate][aria-pressed="true"]') || {}).dataset,
+    };
+    card.dataset.court = ct.id;
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
-      <div class="head">${courtSvg(ct.status === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div></div>
+      <div class="head">${courtSvg(ct.eff === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div></div>
       ${banner}
       <div class="links">
         <a href="${mapsUrl(ct)}" target="_blank" rel="noopener">📍 Google Maps</a>
         <a href="${streetUrl(ct)}" target="_blank" rel="noopener">🚶 Street View</a>
       </div>
-      ${ct.status === "closed"
+      ${ct.eff === "closed"
         // A closed court can't be "good to play" whatever the weather, so no score or best window.
         ? `<div class="verdict skip"><span class="face" aria-hidden="true">🚫</span>
             <div><strong>Not playable</strong><span class="muted small">Weather below is for reference only</span></div>
@@ -310,11 +462,20 @@
         <span>${ICON.wind} ${ct.w[h]} mph, gusts ${ct.g[h]} · from ${compass(ct.d[h])}</span>
         <span>${ICON.rain} ${ct.p[h]}% chance${ct.r[h] > 0 ? ` · ${ct.r[h]}″` : ""}</span>
       </div>
-      ${ct.status === "closed" ? "" : `<div class="muted small">Next 12 hours</div>
+      ${ct.eff === "closed" ? "" : `<div class="muted small">Next 12 hours</div>
       <div class="strip">${strip.join("")}</div>
-      <div class="best">${bestWindow(ct, h)}</div>`}`;
+      <div class="best">${bestWindow(ct, h)}</div>`}
+      ${communityHtml(ct)}`;
     card.hidden = false;
     card.querySelector(".x").addEventListener("click", closeCard);
+    if (draft) {
+      const ta = card.querySelector(".community textarea");
+      if (ta && draft.text != null) ta.value = draft.text;
+      if (draft.rate && draft.rate.rate) {
+        card.querySelectorAll(".community [data-rate]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rate === draft.rate.rate)));
+      }
+    }
+    loadReviews(ct.id);
   }
 
   // Best 2-hour daylight window in the next 12 hours (average score).
@@ -359,20 +520,21 @@
   function renderList() {
     const h = state.hour;
     const items = DATA.courts
-      .filter((c) => (state.schools || c.type !== "school") && c.status !== "closed")   // not-playable courts aren't "best"
-      .sort((a, b) => (a.status === "poor") - (b.status === "poor") ||                 // rough courts sink
+      .filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed")   // not-playable courts aren't "best"
+      .sort((a, b) => (a.eff === "poor") - (b.eff === "poor") ||                 // rough courts sink
         b.s[h] - a.s[h] || a.g[h] - b.g[h] || a.name.localeCompare(b.name));
     $("listTitle").textContent = `Best courts · ${fmtTime(DATA.times[h])}`;
     $("list").innerHTML = items.map((c) => {
       const b = c.b[h];
       const why = c.why[h].length ? c.why[h].join(" · ") : `Gusts ${c.g[h]} mph · ${c.p[h]}% rain · ${c.t[h]}°F`;
       return `<li tabindex="0" data-id="${c.id}">${courtSvg(b)}
-        <div><div class="name">${c.name}</div><div class="sub">${c.city} · ${c.status === "poor" ? "⚠ Rough court · " : ""}${why}</div></div>
+        <div><div class="name">${c.name}</div><div class="sub">${c.city} · ${c.eff === "poor" ? "⚠ Rough court · " : ""}${why}</div></div>
         <span class="num" aria-label="${BAND[b].label}, score">${c.s[h].toFixed(1)}</span></li>`;
     }).join("");
   }
 
   function render() {
+    applyStatuses();
     renderWeather();
     renderMarkers();
     renderCard();
@@ -508,6 +670,7 @@
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) { tick(); refreshData(); } });
+    $("card").addEventListener("click", onCommunityClick);   // rate / save / sign in, inside the court card
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("list").addEventListener("click", pick);
     $("list").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
@@ -559,6 +722,7 @@
       readHash();
       render();
       if (state.selected) select(state.selected);
+      initCommunity();   // reviews load after the map, so they never slow down the forecast
     });
   }
 
