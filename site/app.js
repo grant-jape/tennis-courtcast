@@ -264,7 +264,7 @@
     } else if (state.layer === "wind") {
       html = `<div class="title">Wind gusts</div><div class="bar" style="background:${grad([[[170, 228, 214], 0.15], [[60, 170, 140], 0.7], [[13, 110, 92], 1]])}"></div>
         <div class="ends"><span>calm</span><span>15 mph</span><span>30+ mph</span></div>
-        <div class="keys"><span><i style="background:${PAL.play}"></i>Under 15</span><span><i style="background:${PAL.iffy}"></i>15–24</span><span><i style="background:${PAL.skip}"></i>25+ mph gusts</span></div>`;
+        <div class="keys"><span><i style="background:${PAL.play}"></i>0–7</span><span><i style="background:${PAL.iffy}"></i>8–24</span><span><i style="background:${PAL.skip}"></i>25+ mph gusts</span></div>`;
     } else {
       html = `<div class="title">Rain this hour</div><div class="bar" style="background:${grad([[[125, 178, 240], 0.4], [[57, 135, 229], 0.8], [[16, 66, 129], 1]])}"></div>
         <div class="ends"><span>sprinkle</span><span>0.05″</span><span>0.1″+</span></div>`;

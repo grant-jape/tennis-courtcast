@@ -38,8 +38,8 @@ Wind also rates each court on its own. The Wind view colors courts by this ratin
 
 | Wind rating | Gusts | or steady wind |
 |---|---|---|
-| Play | under 15 mph | under 10 mph |
-| Iffy | 15–24 mph | 10–17 mph |
+| Play | 0–7 mph | under 8 mph |
+| Iffy | 8–24 mph | 8–17 mph |
 | Skip | 25+ mph | 18+ mph |
 
 **Where these come from.** A drag simulation of a tennis ball (57.5 g, 6.7 cm across, drag coefficient about 0.55) in a crosswind shows how far each shot gets pushed sideways:
@@ -51,7 +51,7 @@ Wind also rates each court on its own. The Wind view colors courts by this ratin
 | 20 mph | 0.7 m | 1.5 m | 5.2 m |
 | 25 mph | 1.0 m | 1.9 m (wider than a doubles alley) | 6.8 m |
 
-Below about 15 mph, players can aim for the drift. Above 25 mph, a serve toss moves a full meter and rally balls get pushed more than an alley's width. Coaches' advice lines up with this: about 15 mph is tough but playable, and 25+ is where most recreational players stop. The National Weather Service calls 15–25 mph "breezy" and 25+ "windy". Gusts count more than steady wind, because you can aim for a steady push but not for a gust.
+The group sets the Play cutoff at 7 mph: even a 10 mph gust moves a serve toss about 0.2 m, about three ball-widths. Above 25 mph, a serve toss moves a full meter and rally balls get pushed more than an alley's width. Coaches' advice lines up with this: about 15 mph is tough but playable, and 25+ is where most recreational players stop. The National Weather Service calls 15–25 mph "breezy" and 25+ "windy". Gusts count more than steady wind, because you can aim for a steady push but not for a gust.
 
 ## How it runs
 

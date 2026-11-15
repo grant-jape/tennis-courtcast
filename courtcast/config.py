@@ -55,8 +55,9 @@ WIND = dict(start=8, full=22, max_penalty=4.0)            # mph, sustained
 # Player/coach consensus: ~15 mph is tough but playable; 25+ is where most rec
 # players stop (the NWS calls 15-25 mph "breezy" and 25+ "windy").
 # Gusts count more than steady wind: a steady push you can aim for, a gust you can't.
-WIND_IFFY_GUST, WIND_SKIP_GUST = 15, 25          # mph
-WIND_IFFY_SUSTAINED, WIND_SKIP_SUSTAINED = 10, 18  # mph
+# Play only at 0-7 mph gusts (the group's call: even ~10 mph moves a toss ~0.2 m).
+WIND_IFFY_GUST, WIND_SKIP_GUST = 8, 25           # mph
+WIND_IFFY_SUSTAINED, WIND_SKIP_SUSTAINED = 8, 18   # mph
 WIND_IFFY_CAP, WIND_SKIP_CAP = 6.9, 3.9          # overall score can't be greener than the wind allows
 HEAT = dict(start=88, full=108, max_penalty=4.0)          # F, rising
 COLD = dict(start=48, full=33, max_penalty=3.0)           # F, falling
