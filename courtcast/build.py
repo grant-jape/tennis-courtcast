@@ -119,7 +119,8 @@ def main(argv=None):
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "times": h0["time"][start:start + hours],
         "is_day": h0["is_day"][start:start + hours],
-        "bands": {"play": C.GOOD_AT, "iffy": C.IFFY_AT},
+        "bands": {"play": C.GOOD_AT, "iffy": C.IFFY_AT,
+                  "wind_iffy": C.WIND_IFFY_GUST, "wind_skip": C.WIND_SKIP_GUST},
         "grid": {"step_lat": C.GRID_STEP_LAT, "step_lon": C.GRID_STEP_LON, "cells": []},
         "courts": [],
     }

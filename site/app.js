@@ -20,7 +20,7 @@
 
   // hour = slider position (index into DATA.times); base = index of the real current hour.
   const state = { layer: "play", hour: 0, base: 0, schools: false, selected: null };
-  let DATA, map, markers = [], field, PAL;
+  let DATA, map, markers = [], weather = [], PAL;
 
   // ---------- small helpers ----------
   const $ = (id) => document.getElementById(id);
@@ -116,74 +116,65 @@
     }
   }
 
-  // ---------- smooth condition field ----------
-  // The forecast is a grid of ~3 km cells. We blend between neighbouring cells
-  // (bilinear interpolation) and blur lightly, so the map shows soft "weather
-  // blobs" instead of squares. Good conditions are fully transparent.
-  function buildField() {
+  // ---------- weather icons ----------
+  // Court colours already show playability, so the map only marks *where* the
+  // weather is: faded rain and wind icons sitting behind the courts. The ~3 km
+  // forecast cells are grouped 2x2 (~6 km areas) so icons don't crowd the map.
+  const RAIN_LIKELY = 40;   // % chance: show a plain cloud when rain is likely but none is forecast to fall
+
+  function wxSvg(kind, level) {
+    if (kind === "wind") {
+      return `<svg viewBox="0 0 32 32" class="wx-wind${level === 2 ? " strong" : ""}" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+          <path d="M4 12h15a3.5 3.5 0 1 0-3.4-4.4"/><path d="M4 17h21a3.5 3.5 0 1 1-3.4 4.4"/><path d="M4 22h10"/>
+        </g></svg>`;
+    }
+    // level 0 = cloud only (rain likely); 1-3 drops = sprinkle / rain / heavy rain
+    const xs = { 1: [16], 2: [12.5, 19.5], 3: [10, 16, 22] }[level] || [];
+    return `<svg viewBox="0 0 32 32" class="wx-rain${level ? "" : " cloud"}" aria-hidden="true">
+      <path d="M9.5 21a5.5 5.5 0 0 1 .6-11 7.5 7.5 0 0 1 14.3 1.6A4.7 4.7 0 0 1 23.7 21z" fill="currentColor"/>
+      <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round">${xs.map((x) => `<path d="M${x + 1} 23.5l-1.8 4.5"/>`).join("")}</g>
+    </svg>`;
+  }
+
+  const rainLevel = (inches, chance) =>
+    inches >= 0.1 ? 3 : inches >= 0.02 ? 2 : inches >= 0.002 ? 1 : chance >= RAIN_LIKELY ? 0 : -1;
+  const windLevel = (gust) => (gust >= DATA.bands.wind_skip ? 2 : gust >= DATA.bands.wind_iffy ? 1 : 0);
+
+  function buildWeather() {
+    weather.forEach((w) => w.m.remove());
     const lats = [...new Set(DATA.grid.cells.map((c) => c.lat))].sort((a, b) => a - b);
     const lons = [...new Set(DATA.grid.cells.map((c) => c.lon))].sort((a, b) => a - b);
-    const byKey = new Map(DATA.grid.cells.map((c) => [`${c.lat},${c.lon}`, c]));
-    const rows = lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`)));
-    const px = 24;                                     // pixels per grid step
-    const W = (lons.length - 1) * px + 1, H = (lats.length - 1) * px + 1;
-    const raw = Object.assign(document.createElement("canvas"), { width: W, height: H });
-    const out = Object.assign(document.createElement("canvas"), { width: W, height: H });
-    field = {
-      lats, lons, rows, W, H, raw, out,
-      coords: [[lons[0], lats.at(-1)], [lons.at(-1), lats.at(-1)], [lons.at(-1), lats[0]], [lons[0], lats[0]]],
-    };
+    const groups = new Map();
+    DATA.grid.cells.forEach((c) => {
+      const key = `${Math.floor(lats.indexOf(c.lat) / 2)},${Math.floor(lons.indexOf(c.lon) / 2)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    });
+    weather = [...groups.values()].map((cells) => {
+      const el = document.createElement("div");
+      el.className = "wx";
+      el.style.zIndex = "1";                         // courts start at 10, so they're always in front
+      const lat = cells.reduce((s, c) => s + c.lat, 0) / cells.length;
+      const lon = cells.reduce((s, c) => s + c.lon, 0) / cells.length;
+      const m = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lon, lat]).addTo(map);
+      return { cells, el, m };
+    });
   }
 
-  // value -> [r, g, b, alpha 0..1] for the current layer
-  function colorFor(v) {
-    if (state.layer === "play") {                      // v = score; only trouble shows
-      const a = clamp01((8 - v) / 5) * 0.4;
-      return [...mix([250, 190, 70], [236, 110, 90], clamp01((6.5 - v) / 3)), a];   // soft amber -> coral
-    }
-    if (state.layer === "wind") {                      // v = gust mph
-      const a = clamp01((v - 8) / 20) * 0.6;
-      return [...mix([170, 228, 214], [13, 110, 92], clamp01((v - 10) / 22)), a];
-    }
-    if (v < 0.002) return [0, 0, 0, 0];               // v = rain inches this hour
-    return [...mix([125, 178, 240], [16, 66, 129], clamp01(v / 0.1)), 0.3 + clamp01(v / 0.05) * 0.4];
-  }
-
-  function drawField() {
-    const { rows, W, H, raw, out, lats, lons } = field;
-    const key = { play: "s", wind: "g", rain: "r" }[state.layer];
-    const h = state.hour, nr = lats.length, nc = lons.length;
-    const vals = rows.map((r) => r.map((c) => c[key][h]));
-    const ctx = raw.getContext("2d");
-    const img = ctx.createImageData(W, H);
-    const fadePx = W * 0.07;                           // soften the outer edge of the region
-    for (let y = 0; y < H; y++) {
-      const fy = ((H - 1 - y) / (H - 1)) * (nr - 1);
-      const r0 = Math.min(nr - 2, Math.floor(fy)), ty = fy - r0;
-      for (let x = 0; x < W; x++) {
-        const fx = (x / (W - 1)) * (nc - 1);
-        const c0 = Math.min(nc - 2, Math.floor(fx)), tx = fx - c0;
-        const v = vals[r0][c0] * (1 - tx) * (1 - ty) + vals[r0][c0 + 1] * tx * (1 - ty)
-                + vals[r0 + 1][c0] * (1 - tx) * ty + vals[r0 + 1][c0 + 1] * tx * ty;
-        const [R, G, B, A] = colorFor(v);
-        const edge = clamp01(Math.min(x, W - 1 - x, y, H - 1 - y) / fadePx);
-        const i = (y * W + x) * 4;
-        img.data[i] = R; img.data[i + 1] = G; img.data[i + 2] = B; img.data[i + 3] = 255 * A * edge;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    const octx = out.getContext("2d");
-    octx.clearRect(0, 0, W, H);
-    octx.filter = "blur(5px)";
-    octx.drawImage(raw, 0, 0);
-
-    const url = out.toDataURL();
-    const src = map.getSource("field");
-    if (src) { src.updateImage({ url, coordinates: field.coords }); return; }
-    map.addSource("field", { type: "image", url, coordinates: field.coords });
-    const firstLabel = map.getStyle().layers.find((l) => l.type === "symbol");
-    map.addLayer({ id: "field", type: "raster", source: "field",
-      paint: { "raster-resampling": "linear", "raster-fade-duration": 0, "raster-opacity": 1 } }, firstLabel && firstLabel.id);
+  function renderWeather() {
+    const h = state.hour;
+    weather.forEach(({ cells, el }) => {
+      const rain = Math.max(...cells.map((c) => c.r[h]));
+      const chance = Math.max(...cells.map((c) => c.p[h]));
+      const gust = Math.max(...cells.map((c) => c.g[h]));
+      const icons = [];
+      const rl = rainLevel(rain, chance), wl = windLevel(gust);
+      if (state.layer !== "wind" && rl >= 0) icons.push(wxSvg("rain", rl));
+      if (state.layer !== "rain" && wl) icons.push(wxSvg("wind", wl));
+      el.innerHTML = icons.join("");
+      el.style.display = icons.length ? "" : "none";
+    });
   }
 
   // ---------- court markers ----------
@@ -228,7 +219,7 @@
       // Small court icon with the number beside it, always visible at every zoom.
       // Court icon (coloured by playability) on top; the number on a white label underneath.
       el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b)}</div><div class="lbl">${chipValue(ct, h)}</div><div class="nm">${ct.name}</div>`;
-      el.style.zIndex = String(Math.round(notability(ct, h)));
+      el.style.zIndex = String(10 + Math.round(notability(ct, h)));   // always above weather icons (z 1)
       if (!mk.shown) { m.addTo(map); mk.shown = true; }
     });
   }
@@ -302,19 +293,20 @@
 
   // ---------- legend + list ----------
   function renderLegend() {
-    const grad = (stops) => `linear-gradient(90deg, ${stops.map(([c, a]) => `rgb(${c.join(" ")} / ${a})`).join(", ")})`;
+    const B = DATA.bands;
+    const k = (svg, text) => `<span class="wxk">${svg}${text}</span>`;
     let html;
     if (state.layer === "play") {
       html = `<div class="title">Playability score</div>
         <div class="keys"><span><i style="background:${PAL.play}"></i>Play</span><span><i style="background:${PAL.iffy}"></i>Iffy</span><span><i style="background:${PAL.skip}"></i>Skip it</span></div>
-        <div class="muted small" style="margin-top:3px">Shaded areas = not great</div>`;
+        <div class="keys">${k(wxSvg("rain", 1), "Rain")}${k(wxSvg("wind", 1), "Windy")}</div>`;
     } else if (state.layer === "wind") {
-      html = `<div class="title">Wind gusts</div><div class="bar" style="background:${grad([[[170, 228, 214], 0.15], [[60, 170, 140], 0.7], [[13, 110, 92], 1]])}"></div>
-        <div class="ends"><span>calm</span><span>15 mph</span><span>30+ mph</span></div>
-        <div class="keys"><span><i style="background:${PAL.play}"></i>0–7</span><span><i style="background:${PAL.iffy}"></i>8–24</span><span><i style="background:${PAL.skip}"></i>25+ mph gusts</span></div>`;
+      html = `<div class="title">Wind gusts</div>
+        <div class="keys"><span><i style="background:${PAL.play}"></i>0–${B.wind_iffy - 1}</span><span><i style="background:${PAL.iffy}"></i>${B.wind_iffy}–${B.wind_skip - 1}</span><span><i style="background:${PAL.skip}"></i>${B.wind_skip}+ mph</span></div>
+        <div class="keys">${k(wxSvg("wind", 1), `${B.wind_iffy}–${B.wind_skip - 1} mph`)}${k(wxSvg("wind", 2), `${B.wind_skip}+ mph`)}</div>`;
     } else {
-      html = `<div class="title">Rain this hour</div><div class="bar" style="background:${grad([[[125, 178, 240], 0.4], [[57, 135, 229], 0.8], [[16, 66, 129], 1]])}"></div>
-        <div class="ends"><span>sprinkle</span><span>0.05″</span><span>0.1″+</span></div>`;
+      html = `<div class="title">Rain</div>
+        <div class="keys">${k(wxSvg("rain", 0), "Likely")}${k(wxSvg("rain", 1), "Sprinkle")}${k(wxSvg("rain", 2), "Rain")}${k(wxSvg("rain", 3), "Heavy")}</div>`;
     }
     $("legend").innerHTML = html;
   }
@@ -335,8 +327,7 @@
   }
 
   function render() {
-    const h = state.hour;
-    drawField();
+    renderWeather();
     renderMarkers();
     renderCard();
     renderLegend();
@@ -416,7 +407,7 @@
       const keep = DATA.times[state.hour];
       DATA = d;
       markers.forEach((mk) => { const c = d.courts.find((x) => x.id === mk.ct.id); if (c) mk.ct = c; });
-      buildField();
+      buildWeather();
       state.base = nowIndex();
       const i = DATA.times.indexOf(keep);
       state.hour = Math.max(state.base, i >= 0 ? i : state.base);
@@ -506,7 +497,7 @@
     // tile, which on a slow phone connection delays the court list for no reason.
     map.once("style.load", () => {
       softenBasemap();
-      buildField();
+      buildWeather();
       buildMarkers();
       state.base = state.hour = nowIndex();
       buildTimeline();
