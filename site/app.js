@@ -76,16 +76,28 @@
   const MOON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.8 2.2a6 6 0 1 0 3 9.6 5 5 0 0 1-3-9.6z" fill="currentColor"/></svg>';
 
   // A top-down tennis court, coloured by how playable it is (green / amber / red).
+  // band "closed" = a gray court with a ✕: the court itself isn't playable.
   function courtSvg(band) {
+    const x = band === "closed"
+      ? '<path d="M9 4L21 14M21 4L9 14" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>' : "";
     return `<svg class="court" viewBox="0 0 30 18" aria-hidden="true">
       <rect x=".75" y=".75" width="28.5" height="16.5" rx="3" fill="${PAL[band]}"/>
-      <g fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round">
+      <g fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round" opacity="${x ? 0.45 : 1}">
         <rect x="3.5" y="3" width="23" height="12"/>
         <path d="M9.5 3V15M20.5 3V15M9.5 9H20.5"/>
         <path d="M15 1.8V16.2" stroke-width="1.8"/>
-      </g>
+      </g>${x}
     </svg>`;
   }
+
+  // ---------- court status (from courts.csv: "" / "poor" / "closed") ----------
+  const STATUS = {
+    poor: { badge: "⚠", label: "Rough court", cls: "poor" },
+    closed: { badge: "✕", label: "Not playable", cls: "closed" },
+  };
+  // Free Google Maps links (no API key): the park's place page (photos, reviews, directions) and Street View.
+  const mapsUrl = (ct) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ct.name}, ${ct.city}, CA`)}`;
+  const streetUrl = (ct) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ct.lat},${ct.lon}`;
 
   // ---------- basemap softening ----------
   function softenBasemap() {
@@ -202,14 +214,17 @@
 
   // The label under each court: score, gusts, or rain (amount if any, else chance).
   function chipValue(ct, h) {
-    if (state.layer === "wind") return `${ct.g[h]} mph`;
-    if (state.layer === "rain") return ct.r[h] > 0 ? `${ct.r[h].toFixed(2)} in` : `${ct.p[h]}%`;
-    return ct.s[h] >= 10 ? "10" : ct.s[h].toFixed(1);
+    if (ct.status === "closed") return "Closed";
+    const warn = ct.status === "poor" ? "⚠ " : "";
+    if (state.layer === "wind") return `${warn}${ct.g[h]} mph`;
+    if (state.layer === "rain") return warn + (ct.r[h] > 0 ? `${ct.r[h].toFixed(2)} in` : `${ct.p[h]}%`);
+    return warn + (ct.s[h] >= 10 ? "10" : ct.s[h].toFixed(1));
   }
 
   // How notable a court is for the current view; higher sits on top when markers overlap.
   function notability(ct, h) {
     if (ct.id === state.selected) return 1e6;
+    if (ct.status === "closed") return 0;                 // closed courts sink under the others
     const school = ct.type === "school" ? 0 : 1e5;
     if (state.layer === "wind") return school + ct.g[h];
     if (state.layer === "rain") return school + ct.r[h] * 1000 + ct.p[h];
@@ -223,9 +238,11 @@
       const show = state.schools || ct.type !== "school";
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
-      const b = state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
+      // A closed court is gray with a ✕ whatever the weather.
+      const b = ct.status === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
       el.classList.toggle("selected", state.selected === ct.id);
-      el.setAttribute("aria-label", `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10`);
+      el.setAttribute("aria-label", ct.status === "closed" ? `${ct.name}: not playable` :
+        `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.status === "poor" ? ", rough court" : ""}`);
       // Small court icon with the number beside it, always visible at every zoom.
       // Court icon (coloured by playability) on top; the number on a white label underneath.
       el.innerHTML = `<div class="pin${ct.type === "school" ? " school" : ""}">${courtSvg(b)}</div><div class="lbl">${chipValue(ct, h)}</div><div class="nm">${ct.name}</div>`;
@@ -270,20 +287,32 @@
       const day = DATA.is_day[i];
       strip.push(`<div><span class="dn ${day ? "sun" : "moon"}" title="${day ? "Daylight" : "After dark"}">${day ? SUN : MOON}</span><i class="${ct.b[i]}" title="${fmtTime(DATA.times[i])}: ${ct.s[i]}"></i>${fmtTime(DATA.times[i], true)}</div>`);
     }
+    const st = STATUS[ct.status];
+    const banner = st ? `<div class="status ${st.cls}"><b>${st.badge} ${st.label}</b>${ct.note ? ` · ${ct.note}` : ""}</div>` : "";
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
-      <div class="head">${courtSvg(b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div></div>
-      <div class="verdict ${b}"><span class="face" aria-hidden="true">${BAND[b].face}</span>
-        <div><strong>${BAND[b].label}</strong><span class="muted small">${fmtTime(DATA.times[h])} · ${why}</span></div>
-        <span class="score">${ct.s[h].toFixed(1)}<small>/10</small></span></div>
+      <div class="head">${courtSvg(ct.status === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div></div>
+      ${banner}
+      <div class="links">
+        <a href="${mapsUrl(ct)}" target="_blank" rel="noopener">📍 Google Maps</a>
+        <a href="${streetUrl(ct)}" target="_blank" rel="noopener">🚶 Street View</a>
+      </div>
+      ${ct.status === "closed"
+        // A closed court can't be "good to play" whatever the weather, so no score or best window.
+        ? `<div class="verdict skip"><span class="face" aria-hidden="true">🚫</span>
+            <div><strong>Not playable</strong><span class="muted small">Weather below is for reference only</span></div>
+            <span class="score">—</span></div>`
+        : `<div class="verdict ${b}"><span class="face" aria-hidden="true">${BAND[b].face}</span>
+            <div><strong>${BAND[b].label}</strong><span class="muted small">${fmtTime(DATA.times[h])} · ${why}</span></div>
+            <span class="score">${ct.s[h].toFixed(1)}<small>/10</small></span></div>`}
       <div class="facts">
         <span>${ICON.temp} ${ct.t[h]}°F</span>
         <span>${ICON.wind} ${ct.w[h]} mph, gusts ${ct.g[h]} · from ${compass(ct.d[h])}</span>
         <span>${ICON.rain} ${ct.p[h]}% chance${ct.r[h] > 0 ? ` · ${ct.r[h]}″` : ""}</span>
       </div>
-      <div class="muted small">Next 12 hours</div>
+      ${ct.status === "closed" ? "" : `<div class="muted small">Next 12 hours</div>
       <div class="strip">${strip.join("")}</div>
-      <div class="best">${bestWindow(ct, h)}</div>`;
+      <div class="best">${bestWindow(ct, h)}</div>`}`;
     card.hidden = false;
     card.querySelector(".x").addEventListener("click", closeCard);
   }
@@ -330,14 +359,15 @@
   function renderList() {
     const h = state.hour;
     const items = DATA.courts
-      .filter((c) => state.schools || c.type !== "school")
-      .sort((a, b) => b.s[h] - a.s[h] || a.g[h] - b.g[h] || a.name.localeCompare(b.name));
+      .filter((c) => (state.schools || c.type !== "school") && c.status !== "closed")   // not-playable courts aren't "best"
+      .sort((a, b) => (a.status === "poor") - (b.status === "poor") ||                 // rough courts sink
+        b.s[h] - a.s[h] || a.g[h] - b.g[h] || a.name.localeCompare(b.name));
     $("listTitle").textContent = `Best courts · ${fmtTime(DATA.times[h])}`;
     $("list").innerHTML = items.map((c) => {
       const b = c.b[h];
       const why = c.why[h].length ? c.why[h].join(" · ") : `Gusts ${c.g[h]} mph · ${c.p[h]}% rain · ${c.t[h]}°F`;
       return `<li tabindex="0" data-id="${c.id}">${courtSvg(b)}
-        <div><div class="name">${c.name}</div><div class="sub">${c.city} · ${why}</div></div>
+        <div><div class="name">${c.name}</div><div class="sub">${c.city} · ${c.status === "poor" ? "⚠ Rough court · " : ""}${why}</div></div>
         <span class="num" aria-label="${BAND[b].label}, score">${c.s[h].toFixed(1)}</span></li>`;
     }).join("");
   }
@@ -490,7 +520,7 @@
 
   function start() {
     PAL = {
-      play: css("--play"), iffy: css("--iffy"), skip: css("--skip"),
+      play: css("--play"), iffy: css("--iffy"), skip: css("--skip"), closed: css("--muted"),
       iffyRGB: hex(css("--iffy")), skipRGB: hex(css("--skip")),
     };
     const pts = DATA.courts.filter((c) => c.type !== "school");
