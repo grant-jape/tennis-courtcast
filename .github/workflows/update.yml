@@ -35,9 +35,20 @@ jobs:
         run: python -m unittest discover -s tests -t .
 
       - name: Fetch forecast and build map data
+        id: forecast
+        continue-on-error: true   # a weather-API outage shouldn't block publishing site changes
+        timeout-minutes: 12
         run: python -m courtcast.build --out site/data/forecast.json --snapshot-dir data/snapshots
 
+      - name: Fall back to the last published forecast if the fetch failed
+        if: steps.forecast.outcome == 'failure'
+        run: |
+          echo "::warning::Forecast fetch failed; publishing with the last good forecast data."
+          mkdir -p site/data
+          curl -sf --retry 3 "https://grant-jape.github.io/tennis-courtcast/data/forecast.json" -o site/data/forecast.json
+
       - name: Commit the daily snapshot (first run of each Pacific day)
+        if: steps.forecast.outcome == 'success'
         run: |
           # Commits authored with the GitHub noreply address count toward the
           # contribution graph without exposing a personal email.
