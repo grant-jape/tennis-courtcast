@@ -117,7 +117,12 @@
     ? window.supabase.createClient(SB_URL, SB_KEY, { auth: { flowType: "pkce", detectSessionInUrl: true, persistSession: true } })
     : null;
   const community = { user: null, googleReady: false, summary: new Map(), reviews: new Map(), loading: new Set() };
-  const RATING = { great: { label: "Great", face: "👍" }, okay: { label: "Okay", face: "👌" }, poor: { label: "Poor", face: "👎" } };
+  const RATING = {
+    great: { label: "Great", face: "👍" },
+    okay: { label: "Okay", face: "👌" },
+    poor: { label: "Poor", face: "👎" },
+    unplayable: { label: "Not playable", face: "🚫" },
+  };
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const firstName = (u) => ((u && u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || "you").split(" ")[0];
   function ago(ts) {
@@ -128,14 +133,23 @@
     return `${Math.round(m / 1440)}d ago`;
   }
 
-  // A court the group hasn't marked in courts.csv still gets flagged rough when recent
-  // reviews (last 90 days) are mostly "poor" and at least two players said so.
+  // A court the group hasn't marked in courts.csv still gets flagged from recent reviews
+  // (last 90 days), when at least two players agree and they outnumber everyone else:
+  //   "Not playable" reviews  -> not playable (gray ✕)
+  //   "Poor" + "Not playable" -> rough court (⚠)
   function applyStatuses() {
     DATA.courts.forEach((c) => {
       const s = community.summary.get(c.id);
-      const crowdPoor = s && s.poor >= 2 && s.poor > s.great + s.okay;
-      c.eff = c.status || (crowdPoor ? "poor" : "");
-      c.effNote = c.status ? c.note : crowdPoor ? `${s.poor} players rated it poor recently` : "";
+      const n = (k) => (s && s[k]) || 0;
+      const good = n("great") + n("okay");
+      let crowd = "", note = "";
+      if (n("unplayable") >= 2 && n("unplayable") > good + n("poor")) {
+        crowd = "closed"; note = `${n("unplayable")} players said it's not playable recently`;
+      } else if (n("poor") + n("unplayable") >= 2 && n("poor") + n("unplayable") > good) {
+        crowd = "poor"; note = `${n("poor") + n("unplayable")} players rated it poor or not playable recently`;
+      }
+      c.eff = c.status || crowd;
+      c.effNote = c.status ? c.note : note;
     });
   }
 
@@ -174,7 +188,7 @@
     const list = community.reviews.get(ct.id);
     const s = community.summary.get(ct.id);
     const me = community.user && list ? list.find((r) => r.user_id === community.user.id) : null;
-    const tally = s ? `${RATING.great.face} ${s.great} · ${RATING.okay.face} ${s.okay} · ${RATING.poor.face} ${s.poor}` : "No reviews yet";
+    const tally = s ? Object.entries(RATING).filter(([k]) => s[k]).map(([k, v]) => `${v.face} ${v.label} ${s[k]}`).join(" · ") : "No reviews yet";
     let form;
     if (!community.user) {
       form = community.googleReady
@@ -213,7 +227,7 @@
       await sb.auth.signOut();
     } else if (t.dataset.act === "save") {
       const picked = box.querySelector('[data-rate][aria-pressed="true"]');
-      if (!picked) { say("Pick Great, Okay or Poor first."); return; }
+      if (!picked) { say("Pick Great, Okay, Poor or Not playable first."); return; }
       const comment = box.querySelector("textarea").value.trim().slice(0, 300) || null;
       say("Saving…");
       const { error } = await sb.from("reviews")
