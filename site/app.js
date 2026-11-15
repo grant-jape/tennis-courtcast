@@ -206,7 +206,8 @@
       <span class="muted small">· ${ago(r.updated_at)}</span>${r.comment ? `<div>${esc(r.comment)}</div>` : ""}</li>`).join("");
     return `<div class="community"><div class="ctitle"><strong>Players' reviews</strong><span class="muted small">${tally}</span></div>
       ${list ? (items ? `<ul class="reviews">${items}</ul>` : "") : '<div class="muted small">Loading reviews…</div>'}
-      ${form}<div class="msg small" aria-live="polite"></div></div>`;
+      ${form}<div class="msg small" aria-live="polite"></div>
+      <a class="privacy small" href="privacy.html">Privacy</a></div>`;
   }
 
   async function onCommunityClick(e) {

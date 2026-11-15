@@ -195,6 +195,7 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .community .who { margin-left: auto; }
 .community .who a { color: var(--accent); }
 .community .msg { margin-top: 4px; color: var(--ink-2); min-height: 1em; }
+.community .privacy { display: inline-block; margin-top: 2px; color: var(--muted); }
 /* The card can now be tall on phones; let it scroll instead of covering the whole map. */
 .card { max-height: calc(100% - 24px); overflow-y: auto; }
 .facts span { background: var(--page); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
