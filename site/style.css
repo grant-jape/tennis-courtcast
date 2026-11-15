@@ -90,7 +90,9 @@ h1 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.2px; }
 .layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 330px; min-height: 0; }
 .layout > * { min-width: 0; }
 .mapwrap { position: relative; min-height: 0; }
-#map { position: absolute; inset: 0; background: var(--page); }
+/* isolation: the map is its own stacking layer, so markers' z-index (used to put
+   notable courts on top of each other) can't lift them above the card or legend. */
+#map { position: absolute; inset: 0; background: var(--page); isolation: isolate; z-index: 0; }
 
 /* ---------- legend ---------- */
 .legend {
