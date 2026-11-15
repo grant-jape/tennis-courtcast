@@ -23,6 +23,19 @@ from .score import Hour, score_hour, wind_band
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def score_config():
+    """Every scoring threshold, for the browser's copy of score_hour (site/app.js)."""
+    return {
+        "rain_stop": C.RAIN_STOP, "drizzle": C.DRIZZLE, "drizzle_penalty": C.DRIZZLE_PENALTY,
+        "wet_last_hour_penalty": C.WET_LAST_HOUR_PENALTY, "wet_2_3h_penalty": C.WET_2_3H_PENALTY,
+        "rain_chance": C.RAIN_CHANCE, "gusts": C.GUSTS, "wind": C.WIND, "heat": C.HEAT, "cold": C.COLD,
+        "wind_iffy_gust": C.WIND_IFFY_GUST, "wind_skip_gust": C.WIND_SKIP_GUST,
+        "wind_iffy_sustained": C.WIND_IFFY_SUSTAINED, "wind_skip_sustained": C.WIND_SKIP_SUSTAINED,
+        "wind_iffy_cap": C.WIND_IFFY_CAP, "wind_skip_cap": C.WIND_SKIP_CAP,
+        "good_at": C.GOOD_AT, "iffy_at": C.IFFY_AT,
+    }
+
+
 def load_courts(path=ROOT / "courts.csv"):
     with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
@@ -121,6 +134,11 @@ def main(argv=None):
         "is_day": h0["is_day"][start:start + hours],
         "bands": {"play": C.GOOD_AT, "iffy": C.IFFY_AT,
                   "wind_iffy": C.WIND_IFFY_GUST, "wind_skip": C.WIND_SKIP_GUST},
+        # The browser scores courts outside the Inland Empire itself (it fetches
+        # their forecasts live), so it needs the exact same rules as score.py.
+        "score": score_config(),
+        "region": {"lat_min": C.LAT_MIN, "lat_max": C.LAT_MAX, "lon_min": C.LON_MIN, "lon_max": C.LON_MAX},
+        "model": C.MODEL,
         "grid": {"step_lat": C.GRID_STEP_LAT, "step_lon": C.GRID_STEP_LON, "cells": []},
         "courts": [],
     }
