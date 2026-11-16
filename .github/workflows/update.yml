@@ -45,7 +45,7 @@ jobs:
         run: |
           echo "::warning::Forecast fetch failed; publishing with the last good forecast data."
           mkdir -p site/data
-          curl -sf --retry 3 "https://grant-jape.github.io/tennis-courtcast/data/forecast.json" -o site/data/forecast.json
+          curl -sfL --retry 3 "https://tenniscourtcast.com/data/forecast.json" -o site/data/forecast.json
 
       - name: Commit the daily snapshot (first run of each Pacific day)
         if: steps.forecast.outcome == 'success'
