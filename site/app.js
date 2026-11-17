@@ -366,9 +366,7 @@
         <h3>★ Your courts</h3>${favHtml}
         <h3>Your activity</h3>
         <p class="stats">${s ? `<b>${s.votes}</b> vote${s.votes === 1 ? "" : "s"} · <b>${s.comments}</b> comment${s.comments === 1 ? "" : "s"} · <b>${s.reports}</b> court check${s.reports === 1 ? "" : "s"}` : '<span class="muted">Loading…</span>'}</p>
-        <h3>Settings</h3>
-        <label class="check"><input type="checkbox" data-act="autocheck" ${autoCheckOn() ? "checked" : ""}>
-          <span>When I open CourtCast at a court, ask how many courts are open <span class="muted small">(only if you've allowed location)</span></span></label>
+        <button type="button" class="ghost wide" data-act="settings">⚙ Settings</button>
         <div class="msg small" aria-live="polite"></div>
         <div class="pfoot">
           <button type="button" class="ghost" data-act="signout">Sign out</button>
@@ -390,6 +388,7 @@
     if (act === "autocheck") { store.set("cc-autocheck", t.checked ? "on" : "off"); if (t.checked) autoLocate(true); return; }
     e.preventDefault();
     if (act === "close") closeAccount();
+    else if (act === "settings") { closeAccount(); openSettings(); }
     else if (act === "mode") {
       const email = d.querySelector('input[name="email"]');
       if (email && email.value) acct.email = email.value.trim();
@@ -1061,6 +1060,8 @@
         { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 }));
     } catch (e) {
       ME.busy = false;
+      const sw = $("setUseloc");
+      if (sw) sw.checked = false;
       if (asked) toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your local weather."
         : "Couldn't get your location. Try again in a moment.");
       renderHero();
@@ -1082,6 +1083,13 @@
       const name = j.locality || j.city;
       if (name) { ME.name = name; renderHero(); }
     } catch (_) { /* keep the guess */ }
+  }
+  function stopUsingLocation() {
+    store.set("cc-useloc", "off");
+    ME.pos = ME.exact = null;
+    ME.name = "";
+    if (ME.marker) { ME.marker.remove(); ME.marker = null; }
+    renderPanel();
   }
   async function autoUseLocation() {   // you allowed it before: use it again, without asking
     if (store.get("cc-useloc") !== "on" || !navigator.permissions || !navigator.geolocation) return;
@@ -1643,12 +1651,34 @@
     onRemove() { this.el.remove(); }
   }
 
+  // ---------- settings ----------
+  function openSettings() {
+    $("schools").checked = state.schools;
+    $("setUseloc").checked = !!ME.pos;
+    $("setUseloc").disabled = !navigator.geolocation;
+    $("setAutocheck").checked = autoCheckOn();
+    $("settings").showModal();
+  }
+
   // ---------- wiring ----------
   function wire() {
     document.querySelectorAll(".seg button").forEach((btn) => btn.addEventListener("click", () => {
       setLayer(btn.dataset.layer); render(); saveHash();
     }));
-    $("schools").addEventListener("change", (e) => { state.schools = e.target.checked; render(); saveHash(); });
+    $("schools").addEventListener("change", (e) => {
+      state.schools = e.target.checked;
+      store.set("cc-schools", state.schools ? "on" : "off");
+      render(); saveHash();
+    });
+    $("settingsBtn").addEventListener("click", openSettings);
+    $("settings").addEventListener("click", (e) => {
+      if (e.target === $("settings") || e.target.closest('[data-act="close"]')) $("settings").close();
+    });
+    $("setUseloc").addEventListener("change", (e) => { if (e.target.checked) useMyLocation(true); else stopUsingLocation(); });
+    $("setAutocheck").addEventListener("change", (e) => {
+      store.set("cc-autocheck", e.target.checked ? "on" : "off");
+      if (e.target.checked) autoLocate(true);
+    });
     // Hourly strip: tap an hour; arrow keys step through hours.
     $("hourly").addEventListener("click", (e) => {
       const b = e.target.closest(".hr[data-h]");
@@ -1711,6 +1741,8 @@
       attributionControl: { compact: true, customAttribution: 'Forecast: <a href="https://open-meteo.com/">Open-Meteo</a>' },
       dragRotate: false,
       pitchWithRotate: false,
+      // Phones: one finger scrolls the page past the map; two fingers move it (like Google Maps embeds).
+      cooperativeGestures: matchMedia("(max-width: 760px)").matches,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new HomeControl(), "top-right");
@@ -1732,6 +1764,8 @@
       buildWeather();
       buildMarkers();
       state.base = state.hour = nowIndex();
+      state.schools = store.get("cc-schools") === "on";   // remembered setting; a shared link can still turn it on
+      $("schools").checked = state.schools;
       wire();
       readHash();
       render(true);

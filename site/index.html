@@ -21,7 +21,10 @@
       <img class="logo" src="favicon.svg" alt="" width="36" height="36">
       <h1>Tennis CourtCast</h1>
     </div>
-    <button id="acctBtn" class="acct-btn" hidden>Sign in</button>
+    <div class="top-actions">
+      <button id="settingsBtn" class="icon-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.8l1.6 2.3 2.8-.6.6 2.8 2.3 1.6-1.2 2.6 1.2 2.6-2.3 1.6-.6 2.8-2.8-.6L12 21.2l-1.6-2.3-2.8.6-.6-2.8-2.3-1.6 1.2-2.6-1.2-2.6 2.3-1.6.6-2.8 2.8.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button id="acctBtn" class="acct-btn" hidden>Sign in</button>
+    </div>
   </header>
 
   <main class="layout">
@@ -57,7 +60,6 @@
           <button data-layer="wind" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6h8.2a2.2 2.2 0 1 0-2.1-2.9M1.5 10h11a2 2 0 1 1-1.9 2.6M1.5 8h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Wind</button>
           <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
         </div>
-        <label class="toggle"><input type="checkbox" id="schools"><span class="track" aria-hidden="true"></span> Schools</label>
         <div class="legend" id="legend"></div>
       </div>
       <button id="locateBtn" class="locate" hidden><span aria-hidden="true">📍</span> At a court?</button>
@@ -65,6 +67,21 @@
       <article id="card" class="card" hidden aria-live="polite"></article>
     </section>
   </main>
+
+  <!-- Settings: for everyone, signed in or not. Choices are remembered in this browser. -->
+  <dialog id="settings" class="acct" aria-label="Settings">
+    <button class="x" data-act="close" aria-label="Close">×</button>
+    <div class="setbody">
+      <h2>Settings</h2>
+      <label class="setrow"><span><b>Show school courts</b><span class="muted small">Public access to school courts varies.</span></span>
+        <input type="checkbox" id="schools" class="switch"></label>
+      <label class="setrow"><span><b>Use my location</b><span class="muted small">Your local weather and the best court near you. Rounded to about 1 km.</span></span>
+        <input type="checkbox" id="setUseloc" class="switch"></label>
+      <label class="setrow"><span><b>Ask about open courts</b><span class="muted small">When I open CourtCast at a court, ask how many courts are open.</span></span>
+        <input type="checkbox" id="setAutocheck" class="switch"></label>
+      <div class="muted small fine"><a href="privacy.html">Privacy</a></div>
+    </div>
+  </dialog>
 
   <!-- Sign in / create account / profile. Screens are drawn by app.js into #acctBody. -->
   <dialog id="acct" class="acct" aria-label="Your account">
