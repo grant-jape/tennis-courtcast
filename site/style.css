@@ -57,6 +57,7 @@ button, input { font: inherit; }
   padding: 10px 16px; background: var(--surface); box-shadow: var(--shadow-sm); position: relative; z-index: 6;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
+.logo { width: 36px; height: 36px; display: block; flex: none; }
 .ball {
   width: 30px; height: 30px; border-radius: 50%; flex: none;
   background: radial-gradient(circle at 35% 30%, #f4ff8a, #c9e021 60%, #a9c010);
