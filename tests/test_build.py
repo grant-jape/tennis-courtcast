@@ -27,3 +27,23 @@ class TestDetails(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCellsAndGrid(unittest.TestCase):
+    def test_courts_in_one_square_share_a_point(self):
+        from courtcast.build import cells_of
+        courts = [{"lat": 34.0001, "lon": -117.7001}, {"lat": 34.0049, "lon": -117.6951},   # same ~3 km square
+                  {"lat": 34.1500, "lon": -117.4000}]                                       # far away
+        pts, idx = cells_of(courts)
+        self.assertEqual(len(pts), 2)
+        self.assertEqual(idx[0], idx[1])
+        self.assertNotEqual(idx[0], idx[2])
+        self.assertAlmostEqual(pts[idx[0]][0], 34.0025, places=3)   # average of its courts
+
+    def test_grid_only_near_courts(self):
+        from courtcast.build import grid_points
+        meta, all_pts, _ = grid_points(None)
+        _, near, ij = grid_points([{"lat": 34.0, "lon": -117.7}])
+        self.assertEqual(len(all_pts), meta["nlat"] * meta["nlon"])
+        self.assertTrue(0 < len(near) < 12)                       # a handful around the one court
+        self.assertTrue(all(0 <= i < meta["nlat"] and 0 <= j < meta["nlon"] for i, j in ij))

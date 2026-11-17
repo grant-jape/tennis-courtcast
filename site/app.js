@@ -23,6 +23,16 @@
   let DATA, map, markers = [], weather, PAL;
 
   // ---------- small helpers ----------
+  // Forecast files list each ~3 km square's forecast once ("cells"), and each court points at its
+  // square. Give every court its square's hourly arrays (shared, not copied). Older files had them inline.
+  const CELL_KEYS = ["s", "b", "wb", "why", "t", "p", "r", "w", "g", "d", "wc"];
+  function hydrate(d) {
+    if (d.cells) d.courts.forEach((c) => {
+      const cell = d.cells[c.cell];
+      if (cell) CELL_KEYS.forEach((k) => { if (cell[k]) c[k] = cell[k]; });
+    });
+    return d;
+  }
   const $ = (id) => document.getElementById(id);
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -882,14 +892,26 @@
     gust >= DATA.bands.wind_iffy ? 0.3 + 0.7 * clamp01((gust - DATA.bands.wind_iffy) / (DATA.bands.wind_skip - DATA.bands.wind_iffy)) : 0;
 
   function buildWeather() {
-    const lats = [...new Set(DATA.grid.cells.map((c) => c.lat))].sort((a, b) => a - b);
-    const lons = [...new Set(DATA.grid.cells.map((c) => c.lon))].sort((a, b) => a - b);
-    const byKey = new Map(DATA.grid.cells.map((c) => [`${c.lat},${c.lon}`, c]));
+    const G = DATA.grid;
+    let lats, lons, rows;
+    if (G.nlat) {
+      // Even steps across the region; the build skips points far from any court (ocean, mountains),
+      // and those count as "no weather" so the shading fades out there.
+      const n = DATA.times.length, none = { r: new Array(n).fill(0), p: new Array(n).fill(0), g: new Array(n).fill(0) };
+      lats = Array.from({ length: G.nlat }, (_, i) => G.lat0 + i * G.step_lat);
+      lons = Array.from({ length: G.nlon }, (_, j) => G.lon0 + j * G.step_lon);
+      rows = lats.map(() => lons.map(() => none));
+      G.cells.forEach((c) => { rows[c.i][c.j] = c; });
+    } else {   // older forecast files: a full grid of points
+      lats = [...new Set(G.cells.map((c) => c.lat))].sort((a, b) => a - b);
+      lons = [...new Set(G.cells.map((c) => c.lon))].sort((a, b) => a - b);
+      const byKey = new Map(G.cells.map((c) => [`${c.lat},${c.lon}`, c]));
+      rows = lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`)));
+    }
     const px = 24;                                    // canvas pixels per grid step
     const W = (lons.length - 1) * px + 1, H = (lats.length - 1) * px + 1;
     weather = {
-      lats, lons, W, H,
-      rows: lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`))),
+      lats, lons, W, H, rows,
       canvas: Object.assign(document.createElement("canvas"), { width: W, height: H }),
       coords: [[lons[0], lats.at(-1)], [lons.at(-1), lats.at(-1)], [lons.at(-1), lats[0]], [lons[0], lats[0]]],
     };
@@ -935,16 +957,38 @@
   }
 
   // ---------- court markers ----------
+  // Hundreds of courts: zoomed out, each court is a coloured dot drawn by the map itself (fast,
+  // and tappable); from PIN_ZOOM in, the full court pins with scores appear for courts on screen.
+  const PIN_ZOOM = 12;
   function buildMarkers() {
     DATA.courts.forEach((ct) => {
       const el = document.createElement("div");
       el.className = "court-marker";
       el.tabIndex = 0;
-      el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); });
-      el.addEventListener("keydown", (e) => { if (e.key === "Enter") select(ct.id); });
+      el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); saveHash(); });
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter") { select(ct.id); saveHash(); } });
       const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -11] }).setLngLat([ct.lon, ct.lat]);
       markers.push({ ct, el, m, shown: false });
     });
+    map.addSource("court-dots", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({
+      id: "court-dots", type: "circle", source: "court-dots", maxzoom: PIN_ZOOM,
+      paint: {
+        "circle-color": ["get", "color"],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3.5, 11, 6.5],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 11, 2],
+      },
+    });
+  }
+  const bandAt = (ct, h) => (ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h]);
+  function renderDots() {
+    const src = map.getSource("court-dots"), h = state.hour;
+    if (!src) return;
+    src.setData({ type: "FeatureCollection", features: markers
+      .filter(({ ct }) => state.schools || ct.type !== "school")
+      .map(({ ct }) => ({ type: "Feature", geometry: { type: "Point", coordinates: [ct.lon, ct.lat] },
+        properties: { id: ct.id, color: PAL[bandAt(ct, h)] } })) });
   }
 
   // The label under each court: score, gusts, or rain (amount if any, else chance).
@@ -966,15 +1010,19 @@
     return school + ct.s[h] * 10;
   }
 
-  function renderMarkers() {
-    const h = state.hour;
+  function renderMarkers() { renderDots(); renderPins(); }
+  function renderPins() {
+    const h = state.hour, pins = map.getZoom() >= PIN_ZOOM;
+    const bb = map.getBounds(), dLat = (bb.getNorth() - bb.getSouth()) * 0.2, dLon = (bb.getEast() - bb.getWest()) * 0.2;
     markers.forEach((mk) => {
       const { ct, el, m } = mk;
-      const show = state.schools || ct.type !== "school";
+      const inView = ct.lat > bb.getSouth() - dLat && ct.lat < bb.getNorth() + dLat
+        && ct.lon > bb.getWest() - dLon && ct.lon < bb.getEast() + dLon;
+      const show = (state.schools || ct.type !== "school") && (ct.id === state.selected || (pins && inView));
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
       // A closed court is gray with a ✕ whatever the weather.
-      const b = ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
+      const b = bandAt(ct, h);
       el.classList.toggle("selected", state.selected === ct.id);
       el.setAttribute("aria-label", ct.eff === "closed" ? `${ct.name}: not playable` :
         `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.eff === "poor" ? ", rough court" : ""}`);
@@ -1035,7 +1083,7 @@
 
   // ---------- where the weather panel is: you, a court you tapped, or the whole region ----------
   // REGION has the same per-hour arrays as a court (t, s, g, …), built from the typical
-  // (median) court, so it can stand in for "the Inland Empire" before we know where you are.
+  // (median) court, so it can stand in for "Southern California" before we know where you are.
   let REGION;
   const median = (xs) => {
     const v = xs.filter((x) => x != null && !Number.isNaN(x)).sort((a, b) => a - b);
@@ -1079,7 +1127,7 @@
   // You: set once you tap "Use my location" (and remembered for next time).
   // `pos` is rounded to ~1 km before it's sent anywhere; `exact` only draws your dot on the map.
   const ME = { pos: null, exact: null, name: "", busy: false, marker: null };
-  const REGION_CENTER = { lat: 34.09, lon: -117.6 };
+  const REGION_CENTER = { lat: 33.93, lon: -118.0 };
   function nearestCourts(lat, lon, n = 3) {
     return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
       .map((c) => ({ c, m: meters(lat, lon, c.lat, c.lon) })).sort((a, b) => a.m - b.m).slice(0, n);
@@ -1097,7 +1145,7 @@
         src: { s: best.map((x, h) => x.c.s[h]), b: best.map((x, h) => x.c.b[h]), best }, fb: near[0].c, near,
       };
     }
-    return { kind: "region", name: "Inland Empire", sub: "Claremont to Fontana", ...REGION_CENTER, src: REGION, fb: REGION };
+    return { kind: "region", name: "Southern California", sub: "The coast to the Inland Empire", ...REGION_CENTER, src: REGION, fb: REGION };
   }
 
   async function useMyLocation(asked) {
@@ -1645,7 +1693,7 @@
       const d = await (await fetch("data/forecast.json", { cache: "no-cache" })).json();
       if (d.generated_utc === DATA.generated_utc) return;
       const keep = DATA.times[state.hour];
-      DATA = d;
+      DATA = hydrate(d);
       markers.forEach((mk) => { const c = d.courts.find((x) => x.id === mk.ct.id); if (c) mk.ct = c; });
       buildWeather();
       buildRegion();
@@ -1683,8 +1731,8 @@
   }
 
   // ---------- default view + "show all courts" button ----------
-  // The whole forecast region (Claremont to Fontana, Chino Hills to the foothills), with a margin.
-  const HOME_BOUNDS = [[-117.80, 33.965], [-117.38, 34.215]];
+  // The whole forecast region (Malibu to Riverside, Newport Beach to the San Fernando Valley), with a margin.
+  const HOME_BOUNDS = [[-118.72, 33.54], [-117.28, 34.33]];
   const homePadding = () => (innerWidth < 760 ? 12 : 30);
   function goHome() {
     map.fitBounds(HOME_BOUNDS, { padding: homePadding(), duration: 700 });
@@ -1770,7 +1818,17 @@
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("favList").addEventListener("click", pick);
     $("favList").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
-    map.on("click", () => { if (state.selected) closeCard(); });
+    map.on("click", "court-dots", (e) => {
+      const f = e.features && e.features[0];
+      if (f) { select(f.properties.id); saveHash(); }
+    });
+    map.on("click", (e) => {
+      if (map.getLayer("court-dots") && map.queryRenderedFeatures(e.point, { layers: ["court-dots"] }).length) return;
+      if (state.selected) closeCard();
+    });
+    map.on("mouseenter", "court-dots", () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "court-dots", () => { map.getCanvas().style.cursor = ""; });
+    map.on("moveend", renderPins);   // pins follow what's on screen
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
     map.on("zoom", names);
@@ -1828,7 +1886,7 @@
   fetch("data/forecast.json", { cache: "no-cache" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
-      DATA = d;
+      DATA = hydrate(d);
       showUpdated();
       start();
     })

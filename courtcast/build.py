@@ -13,6 +13,7 @@
 import argparse
 import csv
 import json
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -31,16 +32,44 @@ def load_courts(path=ROOT / "courts.csv"):
     return rows
 
 
-def grid_points():
-    pts = []
-    lat = C.LAT_MIN
-    while lat <= C.LAT_MAX + 1e-9:
-        lon = C.LON_MIN
-        while lon <= C.LON_MAX + 1e-9:
-            pts.append((round(lat, 4), round(lon, 4)))
-            lon += C.GRID_STEP_LON
-        lat += C.GRID_STEP_LAT
-    return pts
+def _km(a_lat, a_lon, b_lat, b_lon):
+    return math.hypot((a_lat - b_lat) * 110.54, (a_lon - b_lon) * 111.32 * math.cos(math.radians(a_lat)))
+
+
+def cells_of(courts):
+    """Group courts into ~3 km squares (the forecast model's own resolution).
+
+    Returns (points, cell index for each court). Each square's point is the average
+    position of its courts, so a lone court is forecast right where it is."""
+    keys, members, idx = {}, [], []
+    for c in courts:
+        k = (round(c["lat"] / C.CELL_LAT), round(c["lon"] / C.CELL_LON))
+        if k not in keys:
+            keys[k] = len(members)
+            members.append([])
+        members[keys[k]].append(c)
+        idx.append(keys[k])
+    pts = [(round(sum(c["lat"] for c in m) / len(m), 4), round(sum(c["lon"] for c in m) / len(m), 4)) for m in members]
+    return pts, idx
+
+
+def grid_points(courts=None):
+    """The rain/wind shading grid: even steps across the region, kept only within
+    GRID_REACH_KM of a court (all of it when `courts` is None).
+    Returns (meta, points, (row, col) of each point)."""
+    nlat = int(round((C.LAT_MAX - C.LAT_MIN) / C.GRID_STEP_LAT)) + 1
+    nlon = int(round((C.LON_MAX - C.LON_MIN) / C.GRID_STEP_LON)) + 1
+    pts, ij = [], []
+    for i in range(nlat):
+        la = round(C.LAT_MIN + i * C.GRID_STEP_LAT, 4)
+        for j in range(nlon):
+            lo = round(C.LON_MIN + j * C.GRID_STEP_LON, 4)
+            if courts is None or any(_km(la, lo, c["lat"], c["lon"]) <= C.GRID_REACH_KM for c in courts):
+                pts.append((la, lo))
+                ij.append((i, j))
+    meta = {"lat0": C.LAT_MIN, "lon0": C.LON_MIN, "step_lat": C.GRID_STEP_LAT, "step_lon": C.GRID_STEP_LON,
+            "nlat": nlat, "nlon": nlon}
+    return meta, pts, ij
 
 
 def now_index(result):
@@ -103,6 +132,11 @@ def daily(result):
     return {"date": d.get("time", []), "sunrise": d.get("sunrise", []), "sunset": d.get("sunset", [])}
 
 
+def in_box(c, box):
+    a, b, lo0, lo1 = box
+    return a <= c["lat"] <= b and lo0 <= c["lon"] <= lo1
+
+
 def write_snapshot(courts, results, start, issued, snap_dir):
     """Save today's first forecast for each court (next 24h). Returns path or None."""
     snap_dir.mkdir(parents=True, exist_ok=True)
@@ -130,41 +164,52 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     courts = load_courts()
-    grid = grid_points()
-    results = fetch([(c["lat"], c["lon"]) for c in courts] + grid)
-    court_res, grid_res = results[:len(courts)], results[len(courts):]
+    cell_pts, cell_of = cells_of(courts)
+    meta, grid, grid_ij = grid_points(courts)
+    mid = (round((C.LAT_MIN + C.LAT_MAX) / 2, 4), round((C.LON_MIN + C.LON_MAX) / 2, 4))
+    print(f"{len(courts)} courts in {len(cell_pts)} weather squares + {len(grid)} grid points "
+          f"= {len(cell_pts) + len(grid) + 1} Open-Meteo calls", flush=True)
+    cell_res = fetch(cell_pts, C.CELL_VARS)
+    grid_res = fetch(grid, C.GRID_VARS)
+    day_res = fetch([mid], ["is_day"], C.DAILY_VARS)[0]
 
-    start, local_now = now_index(results[0])
+    start, local_now = now_index(cell_res[0])
     hours = C.HOURS_AHEAD
-    h0 = results[0]["hourly"]
+    h0 = cell_res[0]["hourly"]
 
     data = {
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "times": h0["time"][start:start + hours],
         "is_day": h0["is_day"][start:start + hours],
-        "daily": daily(results[0]),
+        "daily": daily(day_res),
         "bands": {"play": C.GOOD_AT, "iffy": C.IFFY_AT,
                   "wind_iffy": C.WIND_IFFY_GUST, "wind_skip": C.WIND_SKIP_GUST},
-        "grid": {"step_lat": C.GRID_STEP_LAT, "step_lon": C.GRID_STEP_LON, "cells": []},
+        # Forecast + score per ~3 km square; each court points at its square with "cell".
+        "cells": [],
         "courts": [],
+        "grid": {**meta, "cells": []},
     }
-    for c, res in zip(courts, court_res):
+    for (la, lo), res in zip(cell_pts, cell_res):
+        data["cells"].append({"lat": la, "lon": lo, **series(res, start, hours), "wc": details(res, start, hours)["wc"]})
+    for c, k in zip(courts, cell_of):
         # status: "" (fine) / "poor" (playable but rough) / "closed" (not playable); note explains why.
-        data["courts"].append({**{k: c.get(k) or "" for k in ("id", "name", "city", "type", "status", "note")},
+        data["courts"].append({**{key: c.get(key) or "" for key in ("id", "name", "city", "type", "status", "note")},
                                "lat": c["lat"], "lon": c["lon"],
-                               # optional "courts" column: how many courts the site has (feeds the "likely busy" guess)
+                               # how many courts the site has (feeds the "likely busy" guess)
                                "courts": int(c["courts"]) if (c.get("courts") or "").strip().isdigit() else None,
-                               **series(res, start, hours), **details(res, start, hours)})
-    for (la, lo), res in zip(grid, grid_res):
+                               "cell": k})
+    for (i, j), res in zip(grid_ij, grid_res):
         ser = series(res, start, hours)
-        data["grid"]["cells"].append({"lat": la, "lon": lo, **{k: ser[k] for k in ("s", "p", "r", "w", "g", "d", "t")}})
+        data["grid"]["cells"].append({"i": i, "j": j, **{k: ser[k] for k in ("p", "r", "g")}})   # what the shading uses
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
-    print(f"wrote {out} ({out.stat().st_size // 1024} KB): {len(courts)} courts, {len(grid)} grid cells, {hours} h")
+    print(f"wrote {out} ({out.stat().st_size // 1024} KB): {len(courts)} courts, {len(cell_pts)} squares, "
+          f"{len(grid)} grid cells, {hours} h")
 
-    snap = write_snapshot(courts, court_res, start, local_now, Path(args.snapshot_dir))
+    snap_courts = [(c, cell_res[k]) for c, k in zip(courts, cell_of) if in_box(c, C.SNAPSHOT_BOX)]
+    snap = write_snapshot([c for c, _ in snap_courts], [r for _, r in snap_courts], start, local_now, Path(args.snapshot_dir))
     print(f"snapshot: {snap}" if snap else "snapshot: already have today's")
 
 
