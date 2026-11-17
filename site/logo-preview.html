@@ -80,6 +80,17 @@
         <use href="#cloud" fill="none" stroke="#b7c3d1" stroke-width="1.6"/>
       </g>
 
+      <!-- G, H, I: two clouds side by side, overlapping by a third, sun rising between them -->
+      <symbol id="logoG" viewBox="0 0 64 64">
+        <g transform="translate(0 -4)"><g transform="translate(29 33)"><use href="#rays" stroke="#ffb320"/><circle r="12" fill="url(#sun)"/></g><use href="#ballCloud" transform="translate(-2.9 19.8) scale(.62)"/><use href="#ballCloud" transform="translate(14.4 14.4) scale(.8)"/></g>
+      </symbol>
+      <symbol id="logoH" viewBox="0 0 64 64">
+        <g transform="translate(0 -4)"><g transform="translate(29 33)"><use href="#rays" stroke="#ffb320"/><circle r="12" fill="url(#sun)"/></g><use href="#whiteCloud" transform="translate(-2.9 19.8) scale(.62)"/><use href="#ballCloud" transform="translate(14.4 14.4) scale(.8)"/></g>
+      </symbol>
+      <symbol id="logoI" viewBox="0 0 64 64">
+        <g transform="translate(0 -4)"><g transform="translate(29 33)"><use href="#rays" stroke="#ff8c3a"/><circle r="12.5" fill="url(#sunset)"/></g><use href="#ballCloud" transform="translate(-2.9 19.8) scale(.62)"/><use href="#ballCloud" transform="translate(14.4 14.4) scale(.8)"/></g>
+      </symbol>
+
       <!-- D: big tennis-ball cloud in front, small one behind, sun -->
       <symbol id="logoD" viewBox="0 0 64 64">
         <g transform="translate(44 20) scale(.85)"><use href="#rays" stroke="#ffb320"/><circle r="11" fill="url(#sun)"/></g>
@@ -147,7 +158,62 @@
     <div class="muted">Each one is shown big, as a home-screen icon, at browser-tab sizes, and next to the name. Tell Claude which one, or what to change.</div>
 
 
-    <h2 class="group">New: two clouds</h2>
+    <h2 class="group">Newest: sun rising between two clouds</h2>
+    <section class="opt">
+      <h2>G · Two tennis-ball clouds, sun rising between</h2>
+      <div class="muted">Side by side, overlapping by about a third, with the sun coming up in the middle.</div>
+      <div class="row">
+        <svg class="big"><use href="#logoG"/></svg>
+        <div class="tile"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoG" x="4" y="2" width="56" height="56"/></svg></div>
+        <div class="sizes">
+          <figure><svg class="s32"><use href="#logoG"/></svg><br>32 px</figure>
+          <figure><svg class="s16"><use href="#logoG"/></svg><br>16 px</figure>
+          <div class="tab"><svg class="s16"><use href="#logoG"/></svg> Tennis CourtCast</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="lockup light"><svg><use href="#logoG"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+        <div class="lockup dark"><svg><use href="#logoG"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+      </div>
+    </section>
+
+    <section class="opt">
+      <h2>H · White cloud + tennis-ball cloud, sun rising between</h2>
+      <div class="muted">The small cloud is plain white, so the tennis ball stands out.</div>
+      <div class="row">
+        <svg class="big"><use href="#logoH"/></svg>
+        <div class="tile"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoH" x="4" y="2" width="56" height="56"/></svg></div>
+        <div class="sizes">
+          <figure><svg class="s32"><use href="#logoH"/></svg><br>32 px</figure>
+          <figure><svg class="s16"><use href="#logoH"/></svg><br>16 px</figure>
+          <div class="tab"><svg class="s16"><use href="#logoH"/></svg> Tennis CourtCast</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="lockup light"><svg><use href="#logoH"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+        <div class="lockup dark"><svg><use href="#logoH"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+      </div>
+    </section>
+
+    <section class="opt">
+      <h2>I · Two tennis-ball clouds, sunrise colours</h2>
+      <div class="muted">G with a warm orange sun and sunrise sky.</div>
+      <div class="row">
+        <svg class="big"><use href="#logoI"/></svg>
+        <div class="tile"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#dusk)"/><use href="#logoI" x="4" y="2" width="56" height="56"/></svg></div>
+        <div class="sizes">
+          <figure><svg class="s32"><use href="#logoI"/></svg><br>32 px</figure>
+          <figure><svg class="s16"><use href="#logoI"/></svg><br>16 px</figure>
+          <div class="tab"><svg class="s16"><use href="#logoI"/></svg> Tennis CourtCast</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="lockup light"><svg><use href="#logoI"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+        <div class="lockup dark"><svg><use href="#logoI"/></svg><b>CourtCast <span>tennis weather</span></b></div>
+      </div>
+    </section>
+
+    <h2 class="group">Earlier: two clouds</h2>
     <section class="opt">
       <h2>D · Two tennis-ball clouds</h2>
       <div class="muted">A big tennis-ball cloud in front, a small one drifting behind, sun peeking out.</div>
@@ -267,6 +333,9 @@
           <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoD" x="4" y="2" width="56" height="56"/></svg></div>D</div>
           <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoE" x="4" y="2" width="56" height="56"/></svg></div>E</div>
           <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#dusk)"/><use href="#logoF" x="4" y="2" width="56" height="56"/></svg></div>F</div>
+          <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoG" x="4" y="2" width="56" height="56"/></svg></div>G</div>
+          <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#sky)"/><use href="#logoH" x="4" y="2" width="56" height="56"/></svg></div>H</div>
+          <div><div class="ic"><svg viewBox="0 0 64 64"><rect width="64" height="64" fill="url(#dusk)"/><use href="#logoI" x="4" y="2" width="56" height="56"/></svg></div>I</div>
           <div><div class="ph"></div>Other app</div>
         </div>
       </div>
