@@ -244,6 +244,53 @@
     return sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
   }
 
+  // ---------- Google's own sign-in button (Google Identity Services) ----------
+  // The Google pop-up opens on tenniscourtcast.com and names it, instead of sending people through
+  // our database's bbdfr….supabase.co address. Google hands back a signed ID token; Supabase checks
+  // Google's signature (and our one-time nonce) and signs the player in. The client ID is public.
+  const GOOGLE_CLIENT_ID = "608631987243-5b47ncaoob6bnukk05p82d78eohmnnoa.apps.googleusercontent.com";
+  let gisLoading = null, gisNonce = null;
+  function loadGis() {
+    if (window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve(true);
+    if (!gisLoading) gisLoading = new Promise((ok) => {
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client?hl=en";
+      s.async = true;
+      s.onload = () => ok(!!(window.google && window.google.accounts && window.google.accounts.id));
+      s.onerror = () => { gisLoading = null; ok(false); };
+      document.head.appendChild(s);
+      setTimeout(() => ok(false), 8000);   // blocked or very slow: use the fallback button
+    });
+    return gisLoading;
+  }
+  const sha256hex = async (text) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))]
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+  async function mountGoogleButton() {
+    const slot = $("acctBody").querySelector(".gsi");
+    if (!slot) return;
+    const fallback = $("acctBody").querySelector(".gbtn");
+    const ok = await loadGis();
+    if (!slot.isConnected) return;
+    if (!ok || !window.crypto || !crypto.subtle) { slot.remove(); if (fallback) fallback.hidden = false; return; }
+    // A fresh one-time value: Google stores its hash in the token, Supabase checks the original,
+    // so a token copied from somewhere else can't be replayed.
+    gisNonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24))));
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, nonce: await sha256hex(gisNonce),
+      ux_mode: "popup", auto_select: false, itp_support: true,
+    });
+    window.google.accounts.id.renderButton(slot, {
+      type: "standard", theme: DARK ? "filled_black" : "outline", size: "large", shape: "pill",
+      text: slot.dataset.text, logo_alignment: "center", width: Math.min(400, slot.clientWidth || 320), locale: "en",
+    });
+  }
+  async function onGoogleCredential(resp) {
+    const { error } = await sb.auth.signInWithIdToken({ provider: "google", token: resp.credential, nonce: gisNonce });
+    if (error) { const m = $("acct").querySelector(".msg"); if (m) m.textContent = authError(error); return; }
+    closeAccount();
+    toast(`Signed in. Welcome, ${esc(firstName())}!`);
+  }
+
   // ---------- sign in / create account / profile (one dialog, several screens) ----------
   // Google's standard "G" mark, used as Google's branding guidelines describe.
   const GOOGLE_G = `<svg class="g" viewBox="0 0 48 48" aria-hidden="true">
@@ -295,8 +342,10 @@
   function renderAccount() {
     const m = acct.mode, u = community.user;
     const note = acct.note ? `<div class="note">${esc(acct.note)}</div>` : "";
+    // Google's official button goes in .gsi; the redirect button is the fallback if Google's script can't load.
     const google = community.googleReady
-      ? `<button type="button" class="gbtn" data-act="google">${GOOGLE_G}<span>Continue with Google</span></button>` : "";
+      ? `<div class="gsi" data-text="${m === "signup" ? "signup_with" : "continue_with"}"></div>
+         <button type="button" class="gbtn" data-act="google" hidden>${GOOGLE_G}<span>Continue with Google</span></button>` : "";
     const or = google && community.emailReady ? '<div class="or"><span>or</span></div>' : "";
     const field = (label, name, type, auto, extra = "") =>
       `<label>${label}<input name="${name}" type="${type}" autocomplete="${auto}" required ${extra}></label>`;
@@ -375,6 +424,7 @@
         <div class="muted small fine"><a href="privacy.html">Privacy</a></div>`;
     }
     $("acctBody").innerHTML = html;
+    mountGoogleButton();
   }
 
   async function onAccountClick(e) {
