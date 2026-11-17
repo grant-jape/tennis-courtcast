@@ -41,17 +41,29 @@ def _get(params, retries=5):
             time.sleep(5 * (attempt + 1))
 
 
-def fetch(points):
-    """points: list of (lat, lon). Returns a list of Open-Meteo results, same order."""
+def fetch(points, hourly, daily=None, per_minute=None):
+    """points: list of (lat, lon). Returns a list of Open-Meteo results, same order.
+
+    Open-Meteo counts each location as a call, so requests are paced to stay under
+    `per_minute` calls (its free limit is 600 a minute)."""
     out = []
     n = C.LOCATIONS_PER_REQUEST
+    per_minute = per_minute or C.CALLS_PER_MINUTE
+    window = []   # (time, calls) sent in the last 60 s
     for i in range(0, len(points), n):
         chunk = points[i:i + n]
-        data = _get({
+        now = time.monotonic()
+        window = [(t, k) for t, k in window if now - t < 60]
+        if sum(k for _, k in window) + len(chunk) > per_minute:
+            wait = 60 - (now - window[0][0]) + 1
+            print(f"pacing: waiting {wait:.0f}s to stay under {per_minute} calls/minute", flush=True)
+            time.sleep(wait)
+            window = []
+        window.append((time.monotonic(), len(chunk)))
+        params = {
             "latitude": ",".join(f"{la:.4f}" for la, _ in chunk),
             "longitude": ",".join(f"{lo:.4f}" for _, lo in chunk),
-            "hourly": ",".join(C.HOURLY_VARS),
-            "daily": ",".join(C.DAILY_VARS),
+            "hourly": ",".join(hourly),
             "models": C.MODEL,
             "past_days": 1,       # the hours before "now", for the wet-court check
             "forecast_days": 3,
@@ -59,7 +71,10 @@ def fetch(points):
             "temperature_unit": "fahrenheit",
             "wind_speed_unit": "mph",
             "precipitation_unit": "inch",
-        })
+        }
+        if daily:
+            params["daily"] = ",".join(daily)
+        data = _get(params)
         out.extend(data if isinstance(data, list) else [data])
     if len(out) != len(points):
         raise RuntimeError(f"asked for {len(points)} points, got {len(out)}")

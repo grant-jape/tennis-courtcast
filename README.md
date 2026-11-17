@@ -1,6 +1,6 @@
 # Tennis CourtCast 🎾
 
-**Court-by-court tennis weather for the Inland Empire.** A map of every public court from Claremont to Fontana, colored by a 0–10 playability score, with wind and rain layers and a time slider for the next 36 hours.
+**Court-by-court tennis weather for Southern California.** A map of 850+ public courts (parks, schools and colleges) from Malibu and Santa Monica to Riverside, and from the San Fernando Valley down to Newport Beach and Irvine, colored by a 0–10 playability score, with wind and rain layers and an hour-by-hour forecast for the next 36 hours.
 
 **Live map:** https://tenniscourtcast.com
 

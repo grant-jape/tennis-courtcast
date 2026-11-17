@@ -28,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # the previous commit too, to see what a push changed
 
       - uses: actions/setup-python@v5
         with:
@@ -36,16 +38,36 @@ jobs:
       - name: Test the scoring rules
         run: python -m unittest discover -s tests -t .
 
+      # Each fresh forecast costs ~620 of Open-Meteo's 10,000 free daily calls, so only the
+      # 2-hour timer (and changes to the courts or the build itself) fetch new weather.
+      - name: Decide whether to fetch new weather
+        id: plan
+        run: |
+          fetch=yes
+          if [ "${{ github.event_name }}" = "push" ] && ! git diff --name-only HEAD^1 HEAD | grep -qE '^(courts\.csv|courtcast/)'; then
+            fetch=no; echo "Only the website changed: reusing the live forecast."
+          fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            age=$(curl -sfL https://tenniscourtcast.com/data/forecast.json | python3 -c "import sys, json, datetime as d; g = d.datetime.strptime(json.load(sys.stdin)['generated_utc'], '%Y-%m-%dT%H:%MZ').replace(tzinfo=d.timezone.utc); print(int((d.datetime.now(d.timezone.utc) - g).total_seconds() // 60))" || echo 9999)
+            if [ "$age" -lt 100 ]; then
+              fetch=no; echo "The live forecast is ${age} min old (the 2-hour timer is working): reusing it."
+            fi
+          fi
+          echo "fetch=$fetch" >> "$GITHUB_OUTPUT"
+
       - name: Fetch forecast and build map data
         id: forecast
+        if: steps.plan.outputs.fetch == 'yes'
         continue-on-error: true   # a weather-API outage shouldn't block publishing site changes
-        timeout-minutes: 12
+        timeout-minutes: 15
         run: python -m courtcast.build --out site/data/forecast.json --snapshot-dir data/snapshots
 
-      - name: Fall back to the last published forecast if the fetch failed
-        if: steps.forecast.outcome == 'failure'
+      - name: Use the last published forecast (not fetching, or the fetch failed)
+        if: steps.plan.outputs.fetch == 'no' || steps.forecast.outcome == 'failure'
         run: |
-          echo "::warning::Forecast fetch failed; publishing with the last good forecast data."
+          if [ "${{ steps.forecast.outcome }}" = "failure" ]; then
+            echo "::warning::Forecast fetch failed; publishing with the last good forecast data."
+          fi
           mkdir -p site/data
           curl -sfL --retry 3 "https://tenniscourtcast.com/data/forecast.json" -o site/data/forecast.json
 

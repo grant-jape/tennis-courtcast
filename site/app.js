@@ -23,6 +23,16 @@
   let DATA, map, markers = [], weather, PAL;
 
   // ---------- small helpers ----------
+  // Forecast files list each ~3 km square's forecast once ("cells"), and each court points at its
+  // square. Give every court its square's hourly arrays (shared, not copied). Older files had them inline.
+  const CELL_KEYS = ["s", "b", "wb", "why", "t", "p", "r", "w", "g", "d", "wc"];
+  function hydrate(d) {
+    if (d.cells) d.courts.forEach((c) => {
+      const cell = d.cells[c.cell];
+      if (cell) CELL_KEYS.forEach((k) => { if (cell[k]) c[k] = cell[k]; });
+    });
+    return d;
+  }
   const $ = (id) => document.getElementById(id);
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -882,14 +892,26 @@
     gust >= DATA.bands.wind_iffy ? 0.3 + 0.7 * clamp01((gust - DATA.bands.wind_iffy) / (DATA.bands.wind_skip - DATA.bands.wind_iffy)) : 0;
 
   function buildWeather() {
-    const lats = [...new Set(DATA.grid.cells.map((c) => c.lat))].sort((a, b) => a - b);
-    const lons = [...new Set(DATA.grid.cells.map((c) => c.lon))].sort((a, b) => a - b);
-    const byKey = new Map(DATA.grid.cells.map((c) => [`${c.lat},${c.lon}`, c]));
+    const G = DATA.grid;
+    let lats, lons, rows;
+    if (G.nlat) {
+      // Even steps across the region; the build skips points far from any court (ocean, mountains),
+      // and those count as "no weather" so the shading fades out there.
+      const n = DATA.times.length, none = { r: new Array(n).fill(0), p: new Array(n).fill(0), g: new Array(n).fill(0) };
+      lats = Array.from({ length: G.nlat }, (_, i) => G.lat0 + i * G.step_lat);
+      lons = Array.from({ length: G.nlon }, (_, j) => G.lon0 + j * G.step_lon);
+      rows = lats.map(() => lons.map(() => none));
+      G.cells.forEach((c) => { rows[c.i][c.j] = c; });
+    } else {   // older forecast files: a full grid of points
+      lats = [...new Set(G.cells.map((c) => c.lat))].sort((a, b) => a - b);
+      lons = [...new Set(G.cells.map((c) => c.lon))].sort((a, b) => a - b);
+      const byKey = new Map(G.cells.map((c) => [`${c.lat},${c.lon}`, c]));
+      rows = lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`)));
+    }
     const px = 24;                                    // canvas pixels per grid step
     const W = (lons.length - 1) * px + 1, H = (lats.length - 1) * px + 1;
     weather = {
-      lats, lons, W, H,
-      rows: lats.map((la) => lons.map((lo) => byKey.get(`${la},${lo}`))),
+      lats, lons, W, H, rows,
       canvas: Object.assign(document.createElement("canvas"), { width: W, height: H }),
       coords: [[lons[0], lats.at(-1)], [lons.at(-1), lats.at(-1)], [lons.at(-1), lats[0]], [lons[0], lats[0]]],
     };
@@ -935,16 +957,38 @@
   }
 
   // ---------- court markers ----------
+  // Hundreds of courts: zoomed out, each court is a coloured dot drawn by the map itself (fast,
+  // and tappable); from PIN_ZOOM in, the full court pins with scores appear for courts on screen.
+  const PIN_ZOOM = 12;
   function buildMarkers() {
     DATA.courts.forEach((ct) => {
       const el = document.createElement("div");
       el.className = "court-marker";
       el.tabIndex = 0;
-      el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); });
-      el.addEventListener("keydown", (e) => { if (e.key === "Enter") select(ct.id); });
+      el.addEventListener("click", (e) => { e.stopPropagation(); select(ct.id); saveHash(); });
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter") { select(ct.id); saveHash(); } });
       const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -11] }).setLngLat([ct.lon, ct.lat]);
       markers.push({ ct, el, m, shown: false });
     });
+    map.addSource("court-dots", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({
+      id: "court-dots", type: "circle", source: "court-dots", maxzoom: PIN_ZOOM,
+      paint: {
+        "circle-color": ["get", "color"],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3.5, 11, 6.5],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 11, 2],
+      },
+    });
+  }
+  const bandAt = (ct, h) => (ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h]);
+  function renderDots() {
+    const src = map.getSource("court-dots"), h = state.hour;
+    if (!src) return;
+    src.setData({ type: "FeatureCollection", features: markers
+      .filter(({ ct }) => state.schools || ct.type !== "school")
+      .map(({ ct }) => ({ type: "Feature", geometry: { type: "Point", coordinates: [ct.lon, ct.lat] },
+        properties: { id: ct.id, color: PAL[bandAt(ct, h)] } })) });
   }
 
   // The label under each court: score, gusts, or rain (amount if any, else chance).
@@ -966,15 +1010,19 @@
     return school + ct.s[h] * 10;
   }
 
-  function renderMarkers() {
-    const h = state.hour;
+  function renderMarkers() { renderDots(); renderPins(); }
+  function renderPins() {
+    const h = state.hour, pins = map.getZoom() >= PIN_ZOOM;
+    const bb = map.getBounds(), dLat = (bb.getNorth() - bb.getSouth()) * 0.2, dLon = (bb.getEast() - bb.getWest()) * 0.2;
     markers.forEach((mk) => {
       const { ct, el, m } = mk;
-      const show = state.schools || ct.type !== "school";
+      const inView = ct.lat > bb.getSouth() - dLat && ct.lat < bb.getNorth() + dLat
+        && ct.lon > bb.getWest() - dLon && ct.lon < bb.getEast() + dLon;
+      const show = (state.schools || ct.type !== "school") && (ct.id === state.selected || (pins && inView));
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
       // A closed court is gray with a ✕ whatever the weather.
-      const b = ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h];
+      const b = bandAt(ct, h);
       el.classList.toggle("selected", state.selected === ct.id);
       el.setAttribute("aria-label", ct.eff === "closed" ? `${ct.name}: not playable` :
         `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.eff === "poor" ? ", rough court" : ""}`);
@@ -1035,7 +1083,7 @@
 
   // ---------- where the weather panel is: you, a court you tapped, or the whole region ----------
   // REGION has the same per-hour arrays as a court (t, s, g, …), built from the typical
-  // (median) court, so it can stand in for "the Inland Empire" before we know where you are.
+  // (median) court, so it can stand in for "Southern California" before we know where you are.
   let REGION;
   const median = (xs) => {
     const v = xs.filter((x) => x != null && !Number.isNaN(x)).sort((a, b) => a - b);
@@ -1051,7 +1099,10 @@
     return best;
   };
   function buildRegion() {
-    const cs = DATA.courts.filter((c) => c.type !== "school" && c.status !== "closed");
+    REGION = summarize(DATA.courts.filter((c) => c.type !== "school" && c.status !== "closed"));
+  }
+  // The typical (median) court of a set, hour by hour: a stand-in "place" for an area.
+  function summarize(cs) {
     const H = DATA.times.length;
     const at = (k, f, round = true) => Array.from({ length: H }, (_, h) => {
       const v = f(cs.map((c) => (c[k] ? c[k][h] : null)));
@@ -1061,7 +1112,7 @@
       const v = median(cs.map((c) => (c[k] || [])[i]));
       return v == null ? null : Math.round(v);
     });
-    REGION = {
+    const out = {
       total: cs.length, t: at("t", median), ft: at("ft", median), hu: at("hu", median), cc: at("cc", median),
       uv: at("uv", median, false), w: at("w", median), g: at("g", median), p: at("p", median),
       r: at("r", median, false), wc: at("wc", mode), s: at("s", median, false), hi: day("hi"), lo: day("lo"),
@@ -1073,13 +1124,45 @@
       }),
       good: Array.from({ length: H }, (_, h) => cs.filter((c) => c.b[h] === "play").length),
     };
-    REGION.b = REGION.s.map((s) => bandOf(s));
+    out.b = out.s.map((s) => bandOf(s));
+    return out;
+  }
+
+  // ---------- the panel follows the map ----------
+  // Zoomed in to city level, the panel shows the city with the most courts on screen, with live
+  // weather for the middle of the map and scores for the courts in view. Zoomed out, it goes back
+  // to you (or the whole region).
+  const VIEW_ZOOM = 11;
+  let viewKey = "";
+  function updateView() {
+    if (!DATA || !map) return;
+    let v = null;
+    if (map.getZoom() >= VIEW_ZOOM) {
+      const bb = map.getBounds();
+      const inView = DATA.courts.filter((c) => c.lat >= bb.getSouth() && c.lat <= bb.getNorth()
+        && c.lon >= bb.getWest() && c.lon <= bb.getEast());
+      const shown = inView.filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed");
+      if (shown.length) {
+        const tally = new Map();
+        inView.forEach((c) => tally.set(c.city, (tally.get(c.city) || 0) + 1));
+        const name = [...tally].sort((a, b) => b[1] - a[1])[0][0];
+        const ctr = map.getCenter();
+        // Centre rounded to ~2 km: small pans reuse the same live forecast.
+        v = { name, n: shown.length, lat: Math.round(ctr.lat * 50) / 50, lon: Math.round(ctr.lng * 50) / 50, ids: shown.map((c) => c.id) };
+      }
+    }
+    const key = v ? `${v.name}|${v.lat},${v.lon}|${v.ids.join(",")}|${state.schools}` : "";
+    if (key === viewKey) return;
+    viewKey = key;
+    if (v) v.sum = summarize(v.ids.map((id) => DATA.courts.find((c) => c.id === id)));
+    state.view = v;
+    if (!state.selected) renderPanel();
   }
 
   // You: set once you tap "Use my location" (and remembered for next time).
   // `pos` is rounded to ~1 km before it's sent anywhere; `exact` only draws your dot on the map.
   const ME = { pos: null, exact: null, name: "", busy: false, marker: null };
-  const REGION_CENTER = { lat: 34.09, lon: -117.6 };
+  const REGION_CENTER = { lat: 33.93, lon: -118.0 };
   function nearestCourts(lat, lon, n = 3) {
     return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
       .map((c) => ({ c, m: meters(lat, lon, c.lat, c.lon) })).sort((a, b) => a.m - b.m).slice(0, n);
@@ -1089,6 +1172,10 @@
   function place() {
     const ct = state.selected && DATA.courts.find((c) => c.id === state.selected);
     if (ct) return { kind: "court", name: ct.name, sub: ct.city, lat: ct.lat, lon: ct.lon, src: ct, fb: ct, court: ct };
+    const v = state.view;
+    if (v && !(ME.pos && meters(v.lat, v.lon, ME.pos.lat, ME.pos.lon) < 3000)) {
+      return { kind: "view", name: v.name, sub: `${v.n} court${v.n === 1 ? "" : "s"} on screen`, lat: v.lat, lon: v.lon, src: v.sum, fb: v.sum };
+    }
     if (ME.pos) {
       const near = nearestCourts(ME.pos.lat, ME.pos.lon);
       const best = DATA.times.map((_, h) => near.reduce((a, x) => (!a || x.c.s[h] > a.c.s[h] ? x : a), null));
@@ -1097,63 +1184,82 @@
         src: { s: best.map((x, h) => x.c.s[h]), b: best.map((x, h) => x.c.b[h]), best }, fb: near[0].c, near,
       };
     }
-    return { kind: "region", name: "Inland Empire", sub: "Claremont to Fontana", ...REGION_CENTER, src: REGION, fb: REGION };
+    return { kind: "region", name: "Southern California", sub: "The coast to the Inland Empire", ...REGION_CENTER, src: REGION, fb: REGION };
   }
 
-  async function useMyLocation(asked) {
-    if (!navigator.geolocation || ME.busy) return;
-    ME.busy = true;
-    if (asked) renderHero();
-    let pos;
-    try {
-      pos = await new Promise((ok, fail) => navigator.geolocation.getCurrentPosition(ok, fail,
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 }));
-    } catch (e) {
+  // The ◎ "locate me" button: MapLibre's built-in, like Google Maps. A blue dot with an accuracy
+  // circle; tap to fly to you and follow you as you move; pan away and it stops following (tap to
+  // recentre). Every position it reports also updates the weather panel.
+  let geo = null, lastNamed = null;
+  const LOCATE_ZOOM = 12.5;   // close enough that the courts around you show as pins
+  function addGeolocate() {
+    if (!navigator.geolocation) return;
+    geo = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true, timeout: 15000, maximumAge: 60 * 1000 },
+      trackUserLocation: true, showAccuracyCircle: true, showUserLocation: true,
+      fitBoundsOptions: { maxZoom: LOCATE_ZOOM, duration: 900 },
+    });
+    map.addControl(geo, "top-right");
+    geo.on("geolocate", (e) => setMe(e.coords));
+    geo.on("error", (e) => {
       ME.busy = false;
       const sw = $("setUseloc");
       if (sw) sw.checked = false;
-      if (asked) toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your local weather."
+      toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your area."
         : "Couldn't get your location. Try again in a moment.");
       renderHero();
+    });
+  }
+  function useMyLocation() {
+    if (!geo) return;
+    if (ME.exact) {   // already found you: just recentre
+      map.flyTo({ center: [ME.exact.lon, ME.exact.lat], zoom: Math.max(map.getZoom(), LOCATE_ZOOM), duration: 900 });
       return;
     }
+    ME.busy = true;
+    renderHero();
+    geo.trigger();
+  }
+  async function setMe(coords) {
     ME.busy = false;
-    const { latitude, longitude } = pos.coords;
+    const { latitude, longitude } = coords;
+    ME.exact = { lat: latitude, lon: longitude };   // only for the map; never sent anywhere
     // ~1 km is plenty for weather, and not enough to pinpoint a home.
-    ME.pos = { lat: Math.round(latitude * 100) / 100, lon: Math.round(longitude * 100) / 100 };
-    ME.exact = { lat: latitude, lon: longitude };
+    const pos = { lat: Math.round(latitude * 100) / 100, lon: Math.round(longitude * 100) / 100 };
+    const moved = !ME.pos || ME.pos.lat !== pos.lat || ME.pos.lon !== pos.lon;
+    ME.pos = pos;
     store.set("cc-useloc", "on");
-    const guess = nearestCourts(latitude, longitude, 1)[0];
-    ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
-    showMeOnMap();
-    if (asked) map.easeTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 11.5), duration: 700 });
+    const sw = $("setUseloc");
+    if (sw) sw.checked = true;
+    if (!moved) return;   // following you: only redo the panel when you've moved ~1 km
+    const renamed = !lastNamed || meters(lastNamed.lat, lastNamed.lon, pos.lat, pos.lon) > 1500;
+    if (renamed) {
+      const guess = nearestCourts(latitude, longitude, 1)[0];
+      ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
+      lastNamed = pos;
+    }
     renderPanel();
+    if (!renamed) return;
     try {
-      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${ME.pos.lat}&longitude=${ME.pos.lon}&localityLanguage=en`)).json();
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lon}&localityLanguage=en`)).json();
       const name = j.locality || j.city;
       if (name) { ME.name = name; renderHero(); }
     } catch (_) { /* keep the guess */ }
   }
   function stopUsingLocation() {
     store.set("cc-useloc", "off");
+    // Switch the ◎ button off too (it goes OFF from "following", and via "following" from "background").
+    try { for (let i = 0; i < 2 && geo && geo._watchState && geo._watchState !== "OFF"; i++) geo.trigger(); } catch (_) { /* fine */ }
     ME.pos = ME.exact = null;
     ME.name = "";
-    if (ME.marker) { ME.marker.remove(); ME.marker = null; }
+    lastNamed = null;
     renderPanel();
   }
-  async function autoUseLocation() {   // you allowed it before: use it again, without asking
-    if (store.get("cc-useloc") !== "on" || !navigator.permissions || !navigator.geolocation) return;
-    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(false); } catch (_) { /* fine */ }
-  }
-  function showMeOnMap() {
-    if (!ME.exact) return;
-    if (!ME.marker) {
-      const el = document.createElement("div");
-      el.className = "me-dot";
-      el.title = "You";
-      el.style.zIndex = "3000000";   // above every court pin (their z-index tracks how notable they are)
-      ME.marker = new maplibregl.Marker({ element: el }).setLngLat([ME.exact.lon, ME.exact.lat]).addTo(map);
-    } else ME.marker.setLngLat([ME.exact.lon, ME.exact.lat]);
+  // Opening the site: if you've allowed location before (and haven't turned it off in Settings),
+  // fly straight to your area. First-time visitors aren't asked until they tap ◎ or "Use my location".
+  async function autoUseLocation() {
+    if (store.get("cc-useloc") === "off" || !navigator.permissions || !geo) return;
+    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(); } catch (_) { /* fine */ }
   }
 
   // ---------- live detail from Open-Meteo for the place on screen ----------
@@ -1273,15 +1379,16 @@
       verdict = `<b>${BAND[b].face} ${BAND[b].label} nearby · ${s.toFixed(1)}</b>
         <span>Best near you: <button class="link inline" data-court="${x.c.id}">${esc(x.c.name)}</button> · ${(x.m / 1609).toFixed(1)} mi</span>`;
     } else {
-      const good = REGION.good[h];
-      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${REGION.total} courts` : `${BAND[b].label} across the area`}</b>
+      const good = pl.src.good[h], here = pl.kind === "view" ? " here" : "";
+      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${pl.src.total} court${pl.src.total === 1 ? "" : "s"}${here}` : `${BAND[b].label} ${here ? "here" : "across the area"}`}</b>
         <span>Typical score ${s.toFixed(1)} / 10</span>`;
     }
     const when = now ? `<span class="live-dot"></span>Now · ${clockText()}` : `${fmtTime(DATA.times[h])} · in ${h - state.base} h`;
     const canLocate = !!navigator.geolocation;
     let top;
-    if (pl.kind === "court") top = `<button class="back" data-act="all">‹ ${ME.pos ? esc(ME.name) : "All courts"}</button>`;
+    if (pl.kind === "court") top = `<button class="back" data-act="all">‹ ${state.view ? esc(state.view.name) : ME.pos ? esc(ME.name) : "All courts"}</button>`;
     else if (pl.kind === "me") top = '<div class="eyebrow">📍 Your location</div>';
+    else if (pl.kind === "view") top = `<div class="eyebrow">🗺 On the map · ${esc(pl.sub)}</div>`;
     else top = `<div class="eyebrow">Tennis weather</div>`;
     $("hero").className = `hero sky-${skyOf(rd, h)}`;
     $("hero").innerHTML = `
@@ -1349,15 +1456,7 @@
     [Infinity, "Hazardous", "#6e1b1b", "Stay indoors"],
   ];
   const aqiBand = (v) => AQI_BANDS.find(([max]) => v <= max);
-  function bestWindow(src, h) {
-    let best = null;
-    for (let i = h; i < Math.min(h + 11, DATA.times.length - 1); i++) {
-      if (!DATA.is_day[i] || !DATA.is_day[i + 1]) continue;
-      const avg = (src.s[i] + src.s[i + 1]) / 2;
-      if (!best || avg > best.avg) best = { i, avg };
-    }
-    return best;
-  }
+
   const tile = (cls, icon, title, big, note, extra = "") =>
     `<div class="tile ${cls}"><div class="tile-h">${icon}<span>${title}</span></div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
   const TI = {   // tile header icons (simple line icons; colour comes from CSS)
@@ -1373,26 +1472,9 @@
 
   function renderTiles() {
     const pl = place(), rd = reader(pl), h = state.hour, wx = rd.wx;
-    const closed = pl.kind === "court" && pl.court.eff === "closed";
     const out = [];
 
-    // 1. Best time to play (next 12 hours of daylight)
-    const bw = closed ? null : bestWindow(pl.src, h);
-    const title = pl.kind === "me" ? "Best time to play near you" : "Best time to play";
-    if (closed) out.push(tile("wide", TI.star, title, "Not playable", esc(pl.court.effNote || "")));
-    else if (!bw) out.push(tile("wide", TI.star, title, "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
-    else {
-      const end = DATA.times[bw.i + 2] || DATA.times[bw.i + 1];
-      const who = pl.kind === "me" ? ` at ${esc(pl.src.best[bw.i].c.name)}` : "";
-      out.push(tile(`wide best ${bandOf(bw.avg)}`, TI.star, title,
-        `${fmtTime(DATA.times[bw.i])} – ${fmtTime(end).split(" ").slice(1).join(" ")}`, `Score ${bw.avg.toFixed(1)}${who}`,
-        `<div class="mini">${Array.from({ length: Math.min(12, DATA.times.length - h) }, (_, k) => {
-          const i = h + k;
-          return `<i class="${pl.src.b[i]}${i === bw.i || i === bw.i + 1 ? " pick" : ""}${DATA.is_day[i] ? "" : " dark"}" title="${fmtTime(DATA.times[i])}: ${pl.src.s[i].toFixed(1)}"></i>`;
-        }).join("")}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>+12h</span></div>`));
-    }
-
-    // 2. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
+    // 1. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
     if (wx && wx.f.daily) {
       const D = wx.f.daily, lo = Math.min(...D.temperature_2m_min), hi = Math.max(...D.temperature_2m_max), span = Math.max(1, hi - lo);
       const today = pacificHourStamp().slice(0, 10);
@@ -1409,7 +1491,7 @@
       out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><ul class="ten">${rows}</ul></div>`);
     } else out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><div class="tile-note">Loading…</div></div>`);
 
-    // 3. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
+    // 2. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
     const n = Math.min(24, DATA.times.length - h);
     let total = 0, next = null;
     const bars = Array.from({ length: n }, (_, k) => {
@@ -1423,7 +1505,7 @@
       next === h ? "Rain likely now" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : "No rain expected",
       `<div class="pbars">${bars}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>Chance of rain each hour</span><span>+${n}h</span></div>`));
 
-    // 4. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
+    // 3. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
     const w = round(rd.at("w", h)), g = round(rd.at("g", h)), dir = rd.at("d", h) || 0;
     const wb = g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
     out.push(tile(`wind ${wb}`, TI.wind, "Wind", `${w}<small> mph</small>`, `Gusts ${g} mph<br>From ${compass(dir)}`,
@@ -1431,7 +1513,7 @@
         ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
         <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
 
-    // 5. Air quality (US AQI)
+    // 4. Air quality (US AQI)
     const aqi = rd.at("aqi", h);
     if (aqi != null) {
       const [, label, color, note] = aqiBand(aqi), pm = rd.at("pm25", h);
@@ -1439,7 +1521,7 @@
         `<div class="aqbar"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
     } else out.push(tile("aqi", TI.leaf, "Air quality", "—", wx ? "Not available here" : "Loading…"));
 
-    // 6. UV
+    // 5. UV
     const uv = rd.at("uv", h);
     if (uv != null) {
       const di = wx && wx.f.daily ? wx.f.daily.time.indexOf(DATA.times[h].slice(0, 10)) : -1;
@@ -1448,17 +1530,17 @@
         `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
     }
 
-    // 7. Humidity + dew point
+    // 6. Humidity + dew point
     const hu = round(rd.at("hu", h)), dp = round(rd.at("dp", h)), t = round(rd.at("t", h));
     if (hu != null) out.push(tile("humid", TI.drop, "Humidity", `${hu}<small>%</small>`,
       `${dp != null ? `Dew point ${dp}°<br>` : ""}${hu < 25 ? "Very dry. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play slower." : "Comfortable"}`));
 
-    // 8. Feels like
+    // 7. Feels like
     const ft = round(rd.at("ft", h));
     if (ft != null) out.push(tile("feels", TI.temp, "Feels like", `${ft}°`,
       Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer"));
 
-    // 9. Visibility
+    // 8. Visibility
     const vis = rd.at("vis", h);
     if (vis != null) {
       const mi = vis / 1609;
@@ -1466,7 +1548,7 @@
         mi >= 10 ? "Perfectly clear" : mi >= 5 ? "Light haze" : mi >= 1 ? "Hazy" : "Fog. Hard to track the ball."));
     }
 
-    // 10. Pressure, and which way it's heading (falling pressure often means weather is on the way).
+    // 9. Pressure, and which way it's heading (falling pressure often means weather is on the way).
     const pr = rd.at("pr", h);
     if (pr != null) {
       const earlier = rd.time("pr", DATA.times[h].slice(0, 11) + String(Math.max(0, Number(DATA.times[h].slice(11, 13)) - 3)).padStart(2, "0") + ":00");
@@ -1475,7 +1557,7 @@
         Math.abs(dlt) < 0.7 ? "Steady" : dlt > 0 ? "↑ Rising: settled weather" : "↓ Falling: weather may change"));
     }
 
-    // 11. Sunrise & sunset, with the sun's place along today's arc.
+    // 10. Sunrise & sunset, with the sun's place along today's arc.
     const sun = sunTimes(DATA.times[h].slice(0, 10), rd);
     if (sun) {
       const r0 = hoursOf(sun.rise), s0 = hoursOf(sun.set), now = Number(DATA.times[h].slice(11, 13)) + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
@@ -1645,7 +1727,7 @@
       const d = await (await fetch("data/forecast.json", { cache: "no-cache" })).json();
       if (d.generated_utc === DATA.generated_utc) return;
       const keep = DATA.times[state.hour];
-      DATA = d;
+      DATA = hydrate(d);
       markers.forEach((mk) => { const c = d.courts.find((x) => x.id === mk.ct.id); if (c) mk.ct = c; });
       buildWeather();
       buildRegion();
@@ -1683,8 +1765,8 @@
   }
 
   // ---------- default view + "show all courts" button ----------
-  // The whole forecast region (Claremont to Fontana, Chino Hills to the foothills), with a margin.
-  const HOME_BOUNDS = [[-117.80, 33.965], [-117.38, 34.215]];
+  // The whole forecast region (Malibu to Riverside, Newport Beach to the San Fernando Valley), with a margin.
+  const HOME_BOUNDS = [[-118.72, 33.54], [-117.28, 34.33]];
   const homePadding = () => (innerWidth < 760 ? 12 : 30);
   function goHome() {
     map.fitBounds(HOME_BOUNDS, { padding: homePadding(), duration: 700 });
@@ -1717,14 +1799,15 @@
     }));
     $("schools").addEventListener("change", (e) => {
       state.schools = e.target.checked;
+      viewKey = "";
       store.set("cc-schools", state.schools ? "on" : "off");
-      render(); saveHash();
+      render(); saveHash(); updateView();
     });
     $("settingsBtn").addEventListener("click", openSettings);
     $("settings").addEventListener("click", (e) => {
       if (e.target === $("settings") || e.target.closest('[data-act="close"]')) $("settings").close();
     });
-    $("setUseloc").addEventListener("change", (e) => { if (e.target.checked) useMyLocation(true); else stopUsingLocation(); });
+    $("setUseloc").addEventListener("change", (e) => { if (e.target.checked) useMyLocation(); else stopUsingLocation(); });
     $("setAutocheck").addEventListener("change", (e) => {
       store.set("cc-autocheck", e.target.checked ? "on" : "off");
       if (e.target.checked) autoLocate(true);
@@ -1748,7 +1831,7 @@
       if (t.dataset.court) { select(t.dataset.court); saveHash(); }
       else if (t.dataset.act === "all") closeCard();
       else if (t.dataset.act === "now") setHour(state.base);
-      else if (t.dataset.act === "useloc") useMyLocation(true);
+      else if (t.dataset.act === "useloc") useMyLocation();
     });
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
@@ -1770,7 +1853,17 @@
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("favList").addEventListener("click", pick);
     $("favList").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
-    map.on("click", () => { if (state.selected) closeCard(); });
+    map.on("click", "court-dots", (e) => {
+      const f = e.features && e.features[0];
+      if (f) { select(f.properties.id); saveHash(); }
+    });
+    map.on("click", (e) => {
+      if (map.getLayer("court-dots") && map.queryRenderedFeatures(e.point, { layers: ["court-dots"] }).length) return;
+      if (state.selected) closeCard();
+    });
+    map.on("mouseenter", "court-dots", () => { map.getCanvas().style.cursor = "pointer"; });
+    map.on("mouseleave", "court-dots", () => { map.getCanvas().style.cursor = ""; });
+    map.on("moveend", () => { renderPins(); updateView(); });   // pins and the weather panel follow the map
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
     map.on("zoom", names);
@@ -1796,6 +1889,7 @@
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new HomeControl(), "top-right");
+    addGeolocate();
     map.touchZoomRotate.disableRotation();
     map.on("error", (e) => console.warn("map:", e.error && e.error.message));
     map.on("idle", () => { document.body.dataset.mapReady = "1"; });  // lets tests know rendering finished
@@ -1828,7 +1922,7 @@
   fetch("data/forecast.json", { cache: "no-cache" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => {
-      DATA = d;
+      DATA = hydrate(d);
       showUpdated();
       start();
     })

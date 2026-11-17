@@ -1,58 +1,853 @@
-id,name,city,type,lat,lon,status,note
-cypress-trails-park,Cypress Trails Park,Chino,park,34.00437,-117.6621,,
-olympic-park,Olympic Park,Chino,park,33.99344,-117.66544,,
-crossroads-park,Crossroads Park,Chino Hills,park,33.98106,-117.74257,,
-grand-avenue-park,Grand Avenue Park,Chino Hills,park,33.99273,-117.77461,,
-blaisdell-park,Blaisdell Park,Claremont,park,34.08756,-117.71415,,
-cahuilla-park,Cahuilla Park,Claremont,park,34.11447,-117.72416,,
-claremont-colleges-biszantz-tennis-center,Claremont Colleges – Biszantz Tennis Center,Claremont,college,34.0987,-117.70485,,
-mallows-park,Mallows Park,Claremont,park,34.09898,-117.71951,,
-memorial-park,Memorial Park,Claremont,park,34.10301,-117.71934,,
-pomona-college-pauley-courts,Pomona College – Pauley Courts,Claremont,college,34.09894,-117.7081,,
-pomona-college-south-campus-courts,Pomona College – South Campus Courts,Claremont,college,34.09523,-117.71166,,
-catawba-park,Catawba Park,Fontana,park,34.04569,-117.45837,,
-koehler-park,Koehler Park,Fontana,park,34.12969,-117.46965,,
-mcdermott-park,McDermott Park,Fontana,park,34.11948,-117.49865,,
-san-sevaine-park,San Sevaine Park,Fontana,park,34.15534,-117.48408,,
-southridge-park-don-day-tennis-courts,Southridge Park – Don Day Tennis Courts,Fontana,park,34.04004,-117.48515,,
-kaiser-park,Kaiser Park,Fontana,park,34.08055,-117.49044,closed,
-la-verne-sports-park,La Verne Sports Park,La Verne,park,34.10989,-117.76507,,
-live-oak-park,Live Oak Park,La Verne,park,34.13346,-117.7557,,
-hoffman-park,Hoffman Park,Montclair,park,34.07324,-117.69237,,
-creekside-park,Creekside Park,Ontario,park,34.02007,-117.58342,,
-james-r-bryant-park,James R Bryant Park,Ontario,park,34.06772,-117.65961,,
-john-galvin-park,John Galvin Park,Ontario,park,34.07744,-117.63158,,
-westwind-park,Westwind Park,Ontario,park,34.02033,-117.59886,,
-palomares-park,Palomares Park,Pomona,park,34.09339,-117.74327,,
-washington-park,Washington Park,Pomona,park,34.0484,-117.73911,,
-beryl-park,Beryl Park,Rancho Cucamonga,park,34.13568,-117.60833,,
-chaffey-college,Chaffey College,Rancho Cucamonga,college,34.14759,-117.56839,,
-day-creek-park,Day Creek Park,Rancho Cucamonga,park,34.14396,-117.53479,,
-lions-park,Lions Park,Rancho Cucamonga,park,34.12003,-117.6044,,
-alec-fergusson-park,Alec Fergusson Park,Rialto,park,34.15901,-117.42142,,
-bloomington-high-school,Bloomington High School,Bloomington,school,34.05883,-117.41609,,
-chino-high-school,Chino High School,Chino,school,34.02145,-117.6814,,
-don-antonio-lugo-high-school,Don Antonio Lugo High School,Chino,school,34.01114,-117.71587,,
-ramona-junior-high-school,Ramona Junior High School,Chino,school,34.02454,-117.70649,,
-ayala-high-school,Ayala High School,Chino Hills,school,33.99294,-117.73141,,
-greater-los-angeles,Greater Los Angeles,Claremont,school,34.1165,-117.7134,,
-a-b-miller-high-school,A.B. Miller High School,Fontana,school,34.13131,-117.44533,,
-almeria-middle-school,Almeria Middle School,Fontana,school,34.11271,-117.45789,,
-fontana-high-school,Fontana High School,Fontana,school,34.0809,-117.44973,,
-jurupa-hills-high-school,Jurupa Hills High School,Fontana,school,34.06089,-117.4497,,
-summit-high-school,Summit High School,Fontana,school,34.14629,-117.46522,,
-jurupa-valley-high-school,Jurupa Valley High School,Jurupa Valley,school,34.0026,-117.52265,,
-patriot-high-school,Patriot High School,Jurupa Valley,school,34.00787,-117.45214,,
-rubidoux-high-school,Rubidoux High School,Jurupa Valley,school,34.0016,-117.42595,,
-montclair-high-school,Montclair High School,Montclair,school,34.07338,-117.70452,,
-chaffey-high-school,Chaffey High School,Ontario,school,34.07916,-117.65789,,
-colony-high-school,Colony High School,Ontario,school,34.0148,-117.56966,,
-ontario-high-school,Ontario High School,Ontario,school,34.0377,-117.66603,,
-diamond-ranch-high-school,Diamond Ranch High School,Pomona,school,34.02314,-117.7753,,
-garey-high-school,Garey High School,Pomona,school,34.03767,-117.75009,,
-pomona-senior-high-school,Pomona Senior High School,Pomona,school,34.08558,-117.73873,,
-alta-loma-high-school,Alta Loma High School,Rancho Cucamonga,school,34.12311,-117.61047,,
-etiwanda-high-school,Etiwanda High School,Rancho Cucamonga,school,34.13112,-117.5102,,
-los-osos-high-school,Los Osos High School,Rancho Cucamonga,school,34.14573,-117.55567,,
-rancho-cucamonga-high-school,Rancho Cucamonga High School,Rancho Cucamonga,school,34.13039,-117.54594,,
-wilmer-amina-carter-high-school,Wilmer Amina Carter High School,Rialto,school,34.14484,-117.40264,,
+id,name,city,type,lat,lon,status,note,courts
+cypress-trails-park,Cypress Trails Park,Chino,park,34.00437,-117.6621,,,1
+olympic-park,Olympic Park,Chino,park,33.99344,-117.66544,,,2
+crossroads-park,Crossroads Park,Chino Hills,park,33.98106,-117.74257,,,2
+grand-avenue-park,Grand Avenue Park,Chino Hills,park,33.99273,-117.77461,,,2
+blaisdell-park,Blaisdell Park,Claremont,park,34.08756,-117.71415,,,1
+cahuilla-park,Cahuilla Park,Claremont,park,34.11447,-117.72416,,,15
+claremont-colleges-biszantz-tennis-center,Claremont Colleges – Biszantz Tennis Center,Claremont,college,34.0987,-117.70485,,,13
+mallows-park,Mallows Park,Claremont,park,34.09898,-117.71951,,,1
+memorial-park,Memorial Park,Claremont,park,34.10301,-117.71934,,,1
+pomona-college-pauley-courts,Pomona College – Pauley Courts,Claremont,college,34.09894,-117.7081,,,13
+pomona-college-south-campus-courts,Pomona College – South Campus Courts,Claremont,college,34.09523,-117.71166,,,5
+catawba-park,Catawba Park,Fontana,park,34.04569,-117.45837,,,2
+koehler-park,Koehler Park,Fontana,park,34.12969,-117.46965,,,2
+mcdermott-park,McDermott Park,Fontana,park,34.11948,-117.49865,,,6
+san-sevaine-park,San Sevaine Park,Fontana,park,34.15534,-117.48408,,,4
+southridge-park-don-day-tennis-courts,Southridge Park – Don Day Tennis Courts,Fontana,park,34.04004,-117.48515,,,2
+kaiser-park,Kaiser Park,Fontana,park,34.08055,-117.49044,closed,,2
+la-verne-sports-park,La Verne Sports Park,La Verne,park,34.10989,-117.76507,,,8
+live-oak-park,Live Oak Park,La Verne,park,34.13346,-117.7557,,,2
+hoffman-park,Hoffman Park,Montclair,park,34.07324,-117.69237,,,2
+creekside-park,Creekside Park,Ontario,park,34.02007,-117.58342,,,1
+james-r-bryant-park,James R Bryant Park,Ontario,park,34.06772,-117.65961,,,1
+john-galvin-park,John Galvin Park,Ontario,park,34.07744,-117.63158,,,3
+westwind-park,Westwind Park,Ontario,park,34.02033,-117.59886,,,3
+palomares-park,Palomares Park,Pomona,park,34.09339,-117.74327,,,5
+washington-park,Washington Park,Pomona,park,34.0484,-117.73911,,,2
+beryl-park,Beryl Park,Rancho Cucamonga,park,34.13568,-117.60833,,,1
+chaffey-college,Chaffey College,Rancho Cucamonga,college,34.14759,-117.56839,,,6
+day-creek-park,Day Creek Park,Rancho Cucamonga,park,34.14396,-117.53479,,,4
+lions-park,Lions Park,Rancho Cucamonga,park,34.12003,-117.6044,,,2
+alec-fergusson-park,Alec Fergusson Park,Rialto,park,34.15901,-117.42142,,,1
+bloomington-high-school,Bloomington High School,Bloomington,school,34.05883,-117.41609,,,3
+chino-high-school,Chino High School,Chino,school,34.02145,-117.6814,,,8
+don-antonio-lugo-high-school,Don Antonio Lugo High School,Chino,school,34.01114,-117.71587,,,6
+ramona-junior-high-school,Ramona Junior High School,Chino,school,34.02454,-117.70649,,,4
+ayala-high-school,Ayala High School,Chino Hills,school,33.99294,-117.73141,,,6
+greater-los-angeles,Greater Los Angeles,Claremont,school,34.1165,-117.7134,,,1
+a-b-miller-high-school,A.B. Miller High School,Fontana,school,34.13131,-117.44533,,,6
+almeria-middle-school,Almeria Middle School,Fontana,school,34.11271,-117.45789,,,6
+fontana-high-school,Fontana High School,Fontana,school,34.0809,-117.44973,,,2
+jurupa-hills-high-school,Jurupa Hills High School,Fontana,school,34.06089,-117.4497,,,8
+summit-high-school,Summit High School,Fontana,school,34.14629,-117.46522,,,1
+jurupa-valley-high-school,Jurupa Valley High School,Jurupa Valley,school,34.0026,-117.52265,,,1
+patriot-high-school,Patriot High School,Jurupa Valley,school,34.00787,-117.45214,,,8
+rubidoux-high-school,Rubidoux High School,Jurupa Valley,school,34.0016,-117.42595,,,1
+montclair-high-school,Montclair High School,Montclair,school,34.07338,-117.70452,,,8
+chaffey-high-school,Chaffey High School,Ontario,school,34.07916,-117.65789,,,8
+colony-high-school,Colony High School,Ontario,school,34.0148,-117.56966,,,9
+ontario-high-school,Ontario High School,Ontario,school,34.0377,-117.66603,,,8
+diamond-ranch-high-school,Diamond Ranch High School,Pomona,school,34.02314,-117.7753,,,9
+garey-high-school,Garey High School,Pomona,school,34.03767,-117.75009,,,7
+pomona-senior-high-school,Pomona Senior High School,Pomona,school,34.08558,-117.73873,,,7
+alta-loma-high-school,Alta Loma High School,Rancho Cucamonga,school,34.12311,-117.61047,,,8
+etiwanda-high-school,Etiwanda High School,Rancho Cucamonga,school,34.13112,-117.5102,,,8
+los-osos-high-school,Los Osos High School,Rancho Cucamonga,school,34.14573,-117.55567,,,8
+rancho-cucamonga-high-school,Rancho Cucamonga High School,Rancho Cucamonga,school,34.13039,-117.54594,,,8
+wilmer-amina-carter-high-school,Wilmer Amina Carter High School,Rialto,school,34.14484,-117.40264,,,9
+alhambra-high-school-alhambra,Alhambra High School,Alhambra,school,34.09189,-118.12957,,,6
+alhambra-park-alhambra,Alhambra Park,Alhambra,park,34.09515,-118.14544,,,5
+almansor-park-alhambra,Almansor Park,Alhambra,park,34.08735,-118.11657,,,3
+granada-park-alhambra,Granada Park,Alhambra,park,34.06680,-118.14636,,,2
+joslyn-adult-recreation-center-alhambra,Joslyn Adult Recreation Center,Alhambra,park,34.09913,-118.12484,,,2
+mark-keppel-high-school-alhambra,Mark Keppel High School,Alhambra,school,34.07118,-118.11220,,,8
+san-gabriel-high-school-alhambra,San Gabriel High School,Alhambra,school,34.09191,-118.11113,,,9
+aliso-niguel-high-school-aliso-viejo,Aliso Niguel High School,Aliso Viejo,school,33.56287,-117.71867,,,6
+glenbrook-park-aliso-viejo,Glenbrook Park,Aliso Viejo,park,33.59359,-117.72057,,,2
+hillview-park-aliso-viejo,Hillview Park,Aliso Viejo,park,33.55741,-117.72015,,,3
+iglesia-park-aliso-viejo,Iglesia Park,Aliso Viejo,park,33.60586,-117.72329,,,1
+ridgecrest-park-aliso-viejo,Ridgecrest Park,Aliso Viejo,park,33.59491,-117.73107,,,2
+soka-university-of-america-aliso-viejo,Soka University of America,Aliso Viejo,college,33.55838,-117.73347,,,6
+alondra-community-regional-park-alondra-park,Alondra Community Regional Park,Alondra Park,park,33.88691,-118.34216,,,1
+el-camino-college-alondra-park,El Camino College,Alondra Park,college,33.88264,-118.32999,,,6
+charles-s-farnsworth-park-altadena,Charles S. Farnsworth Park,Altadena,park,34.20083,-118.13265,,,1
+loma-alta-park-altadena,Loma Alta Park,Altadena,park,34.20148,-118.15779,,,1
+anaheim-coves-park-anaheim,Anaheim Coves Park,Anaheim,park,33.83550,-117.86666,,,1
+anaheim-high-school-anaheim,Anaheim High School,Anaheim,school,33.83551,-117.92668,,,7
+boysen-park-anaheim,Boysen Park,Anaheim,park,33.82473,-117.89088,,,10
+brookhurst-junior-high-school-anaheim,Brookhurst Junior High School,Anaheim,school,33.84195,-117.95954,,,5
+canyon-high-school-anaheim,Canyon High School,Anaheim,school,33.85061,-117.78997,,,6
+danbrook-elementary-school-anaheim,Danbrook Elementary School,Anaheim,school,33.82882,-118.00792,,,2
+katella-high-school-anaheim,Katella High School,Anaheim,school,33.82332,-117.88325,,,8
+la-palma-park-anaheim,La Palma Park,Anaheim,park,33.85036,-117.92289,,,2
+loara-high-school-anaheim,Loara High School,Anaheim,school,33.81145,-117.94191,,,9
+magnolia-high-school-anaheim,Magnolia High School,Anaheim,school,33.81441,-117.97142,,,8
+olive-hills-park-anaheim,Olive Hills Park,Anaheim,park,33.83697,-117.82425,,,6
+pearson-park-anaheim,Pearson Park,Anaheim,park,33.83720,-117.91819,,,6
+peralta-canyon-park-anaheim,Peralta Canyon Park,Anaheim,park,33.85254,-117.80444,,,1
+savanna-high-school-anaheim,Savanna High School,Anaheim,school,33.83584,-117.97148,,,8
+south-junior-high-school-anaheim,South Junior High School,Anaheim,school,33.83127,-117.88471,,,6
+western-high-school-anaheim,Western High School,Anaheim,school,33.82719,-118.00388,,,8
+arcadia-county-park-arcadia,Arcadia County Park,Arcadia,park,34.13709,-118.03445,,,12
+arcadia-high-school-arcadia,Arcadia High School,Arcadia,school,34.12942,-118.03434,,,8
+bicentennial-park-arcadia,Bicentennial Park,Arcadia,park,34.11389,-118.01886,,,2
+camino-grove-park-tennis-courts-arcadia,Camino Grove Park Tennis Courts,Arcadia,park,34.12356,-118.01830,,,3
+holly-avenue-park-arcadia,Holly Avenue Park,Arcadia,park,34.12682,-118.04420,,,2
+hugo-reid-school-arcadia,Hugo Reid School,Arcadia,school,34.13833,-118.06735,,,3
+newcastle-park-arcadia,Newcastle Park,Arcadia,park,34.14581,-118.03456,,,2
+orange-grove-park-arcadia,Orange Grove Park,Arcadia,park,34.15663,-118.05237,,,5
+tierra-verde-park-arcadia,Tierra Verde Park,Arcadia,park,34.12137,-118.02412,,,2
+branford-park-arleta,Branford Park,Arleta,park,34.23291,-118.42283,,,2
+azusa-high-school-azusa,Azusa High School,Azusa,college,34.12551,-117.89682,,,8
+azusa-pacific-university-azusa,Azusa Pacific University,Azusa,college,34.13424,-117.89715,,,10
+memorial-park-azusa,Memorial Park,Azusa,park,34.12775,-117.91072,,,3
+northside-park-azusa,Northside Park,Azusa,park,34.14318,-117.91303,,,1
+baldwin-park-high-school-baldwin-park,Baldwin Park High School,Baldwin Park,school,34.08376,-117.94771,,,6
+sierra-vista-high-school-baldwin-park,Sierra Vista High School,Baldwin Park,school,34.07614,-117.97809,,,4
+bell-high-school-bell,Bell High School,Bell,school,33.97293,-118.19106,,,4
+bell-gardens-high-school-bell-gardens,Bell Gardens High School,Bell Gardens,school,33.97792,-118.15609,,,4
+bell-gardens-veterans-park-bell-gardens,Bell Gardens Veterans Park,Bell Gardens,park,33.96671,-118.14695,,,2
+bellflower-middle-high-school-bellflower,Bellflower Middle & High School,Bellflower,school,33.89264,-118.11495,,,8
+ruth-r-caruthers-park-bellflower,Ruth R. Caruthers Park,Bellflower,park,33.87903,-118.10956,,,2
+beverly-hills-high-school-beverly-hills,Beverly Hills High School,Beverly Hills,school,34.06157,-118.41059,,,6
+coldwater-canyon-park-beverly-hills,Coldwater Canyon Park,Beverly Hills,park,34.09046,-118.41241,,,14
+el-rodeo-elementary-school-beverly-hills,El Rodeo Elementary School,Beverly Hills,school,34.06763,-118.41405,,,1
+gateway-triangle-beverly-hills,Gateway Triangle,Beverly Hills,park,34.08107,-118.42227,,,3
+greystone-mansion-gardens-beverly-hills,Greystone Mansion & Gardens,Beverly Hills,park,34.09039,-118.40274,,,5
+la-cienega-park-beverly-hills,La Cienega Park,Beverly Hills,park,34.06195,-118.37683,,,17
+roxbury-park-beverly-hills,Roxbury Park,Beverly Hills,park,34.05860,-118.40614,,,4
+the-maltz-park-beverly-hills,The Maltz Park,Beverly Hills,park,34.07604,-118.41961,,,3
+virginia-robinson-gardens-beverly-hills,Virginia Robinson Gardens,Beverly Hills,park,34.08618,-118.41874,,,9
+first-street-elementary-school-boyle-heights,First Street Elementary School,Boyle Heights,school,34.04001,-118.20495,,,1
+theodore-roosevelt-senior-high-school-boyle-heights,Theodore Roosevelt Senior High School,Boyle Heights,school,34.03718,-118.20981,,,4
+brea-olinda-high-school-brea,Brea Olinda High School,Brea,school,33.93099,-117.87643,,,6
+carbon-canyon-regional-park-brea,Carbon Canyon Regional Park,Brea,park,33.92133,-117.83217,,,8
+woodcrest-park-brea,Woodcrest Park,Brea,park,33.94556,-117.91127,,,1
+barrington-recreation-center-brentwood,Barrington Recreation Center,Brentwood,park,34.06084,-118.46916,,,4
+brentwood-school-east-campus-brentwood,Brentwood School East Campus,Brentwood,school,34.06789,-118.46929,,,2
+kenter-canyon-elementary-school-brentwood,Kenter Canyon Elementary School,Brentwood,school,34.07171,-118.48835,,,1
+paul-revere-charter-middle-school-brentwood,Paul Revere Charter Middle School,Brentwood,school,34.05592,-118.49356,,,3
+bellis-park-buena-park,Bellis Park,Buena Park,park,33.86833,-118.01007,,,5
+boisseranc-park-buena-park,Boisseranc Park,Buena Park,park,33.85387,-117.98399,,,4
+buena-park-high-school-buena-park,Buena Park High School,Buena Park,school,33.86370,-117.97707,,,6
+ralph-b-clark-regional-park-buena-park,Ralph B. Clark Regional Park,Buena Park,park,33.89353,-117.97984,,,6
+brace-canyon-park-burbank,Brace Canyon Park,Burbank,park,34.21181,-118.32820,,,1
+burbank-high-school-burbank,Burbank High School,Burbank,school,34.18906,-118.31659,,,1
+burbank-tennis-center-burbank,Burbank Tennis Center,Burbank,park,34.19221,-118.32080,,,14
+george-izay-park-burbank,George Izay Park,Burbank,park,34.17241,-118.31865,,,2
+john-burroughs-senior-high-school-burbank,John Burroughs Senior High School,Burbank,school,34.16848,-118.32642,,,8
+mountain-view-park-burbank,Mountain View Park,Burbank,park,34.15795,-118.31529,,,2
+verdugo-park-burbank,Verdugo Park,Burbank,park,34.16373,-118.33974,,,2
+calabasas-high-school-calabasas,Calabasas High School,Calabasas,school,34.13831,-118.63003,,,9
+calabasas-swim-and-tennis-center-calabasas,Calabasas Swim and Tennis Center,Calabasas,park,34.15522,-118.63856,,,16
+lake-calabasas-park-calabasas,Lake Calabasas Park,Calabasas,park,34.14916,-118.63231,,,1
+john-quimby-park-canoga-park,John Quimby Park,Canoga Park,park,34.19915,-118.58770,,,2
+lanark-park-canoga-park,Lanark Park,Canoga Park,park,34.21715,-118.60201,,,4
+anderson-park-carson,Anderson Park,Carson,park,33.85628,-118.23604,,,4
+calas-park-carson,Calas Park,Carson,park,33.82761,-118.25608,,,2
+california-state-university-dominguez-hills-carson,California State University - Dominguez Hills,Carson,college,33.86230,-118.25743,,,13
+dignity-health-sports-park-carson,Dignity Health Sports Park,Carson,park,33.86151,-118.26117,,,13
+dolphin-park-carson,Dolphin Park,Carson,park,33.83786,-118.24157,,,2
+dominguez-park-carson,Dominguez Park,Carson,park,33.83644,-118.21255,,,2
+foisia-park-carson,Foisia Park,Carson,park,33.81262,-118.26998,,,2
+stevenson-park-carson,Stevenson Park,Carson,park,33.87060,-118.25719,,,2
+veterans-park-and-sports-complex-carson,Veterans Park and Sports Complex,Carson,park,33.82223,-118.28140,,,1
+victoria-community-regional-park-carson,Victoria Community Regional Park,Carson,park,33.85653,-118.27133,,,1
+ross-snyder-recreation-center-central-alameda,Ross Snyder Recreation Center,Central-Alameda,park,34.00885,-118.24675,,,2
+cerritos-high-school-cerritos,Cerritos High School,Cerritos,school,33.86276,-118.06510,,,8
+cerritos-park-east-cerritos,Cerritos Park East,Cerritos,park,33.87841,-118.05153,,,4
+don-knabe-community-regional-park-cerritos,Don Knabe Community Regional Park,Cerritos,park,33.84950,-118.05770,,,12
+joe-a-gonsalves-elementary-school-cerritos,Joe A Gonsalves Elementary School,Cerritos,school,33.87776,-118.04071,,,2
+liberty-park-cerritos,Liberty Park,Cerritos,park,33.85415,-118.10013,,,6
+richard-gahr-high-school-cerritos,Richard Gahr High School,Cerritos,school,33.87379,-118.09832,,,12
+valley-christian-high-school-cerritos,Valley Christian High School,Cerritos,school,33.87032,-118.10315,,,4
+chatsworth-high-school-chatsworth,Chatsworth High School,Chatsworth,school,34.25520,-118.58607,,,5
+chatsworth-park-south-chatsworth,Chatsworth Park South,Chatsworth,park,34.26034,-118.61611,,,1
+sierra-canyon-middle-school-chatsworth,Sierra Canyon Middle School,Chatsworth,school,34.27034,-118.59376,,,14
+nature-retreat-park-chino,Nature Retreat Park,Chino,park,33.96548,-117.63856,,,2
+chino-hills-high-school-chino-hills,Chino Hills High School,Chino Hills,school,33.96039,-117.68864,,,6
+hope-for-the-hills-park-chino-hills,Hope for the Hills Park,Chino Hills,park,33.97686,-117.75687,,,4
+vellano-park-chino-hills,Vellano Park,Chino Hills,park,33.95562,-117.73524,,,1
+claremont-mckenna-college-claremont,Claremont McKenna College,Claremont,college,34.10116,-117.70652,,,1
+mcmillan-park-claremont,McMillan Park,Claremont,park,34.12455,-117.73786,,,6
+colton-high-school-colton,Colton High School,Colton,school,34.07132,-117.33502,,,8
+rosewood-park-commerce,Rosewood Park,Commerce,park,34.00252,-118.15650,,,2
+saybrook-park-commerce,Saybrook Park,Commerce,park,34.01287,-118.13718,,,1
+veterans-memorial-park-commerce,Veterans Memorial Park,Commerce,park,33.97161,-118.12736,,,2
+centennial-high-school-compton,Centennial High School,Compton,school,33.91320,-118.25257,,,8
+compton-high-school-compton,Compton High School,Compton,school,33.89112,-118.22900,,,8
+roosevelt-middle-school-compton,Roosevelt Middle School,Compton,school,33.88737,-118.21208,,,2
+tragview-park-compton,Tragview Park,Compton,park,33.88914,-118.25067,,,2
+centennial-high-school-corona,Centennial High School,Corona,school,33.85847,-117.54810,,,6
+corona-high-school-corona,Corona High School,Corona,school,33.87080,-117.58516,,,8
+eagle-glen-community-park-corona,Eagle Glen Community Park,Corona,park,33.81651,-117.53112,,,3
+husted-park-corona,Husted Park,Corona,park,33.87003,-117.57314,,,1
+kellogg-park-corona,Kellogg Park,Corona,park,33.86388,-117.55760,,,4
+letha-raney-intermediate-school-corona,Letha Raney Intermediate School,Corona,school,33.86254,-117.58242,,,4
+mangular-park-corona,Mangular Park,Corona,park,33.85897,-117.59783,,,2
+mountain-gate-park-corona,Mountain Gate Park,Corona,park,33.84076,-117.57321,,,4
+promenade-community-park-corona,Promenade Community Park,Corona,park,33.89579,-117.51959,,,2
+santiago-high-school-corona,Santiago High School,Corona,school,33.83691,-117.54595,,,8
+back-bay-high-school-costa-mesa,Back Bay High School,Costa Mesa,school,33.65538,-117.89028,,,1
+canyon-park-costa-mesa,Canyon Park,Costa Mesa,park,33.64995,-117.94399,,,1
+costa-mesa-high-school-costa-mesa,Costa Mesa High School,Costa Mesa,school,33.67257,-117.90439,,,8
+del-mesa-park-costa-mesa,Del Mesa Park,Costa Mesa,park,33.68294,-117.87871,,,1
+estancia-high-school-costa-mesa,Estancia High School,Costa Mesa,school,33.66047,-117.93573,,,8
+halecrest-park-costa-mesa,Halecrest Park,Costa Mesa,park,33.68438,-117.91516,,,2
+heinz-kaiser-elementary-school-costa-mesa,Heinz Kaiser Elementary School,Costa Mesa,school,33.64581,-117.90129,,,1
+orange-coast-college-costa-mesa,Orange Coast College,Costa Mesa,college,33.67466,-117.91096,,,9
+sonora-elementary-school-costa-mesa,Sonora Elementary School,Costa Mesa,school,33.67619,-117.89567,,,1
+tanager-park-costa-mesa,Tanager Park,Costa Mesa,park,33.67120,-117.92727,,,1
+tewinkle-park-costa-mesa,TeWinkle Park,Costa Mesa,park,33.67019,-117.89316,,,12
+wimbledon-park-costa-mesa,Wimbledon Park,Costa Mesa,park,33.69339,-117.90583,,,3
+tesoro-high-school-coto-de-caza,Tesoro High School,Coto De Caza,school,33.57951,-117.61218,,,8
+charter-oak-high-school-covina,Charter Oak High School,Covina,school,34.09610,-117.86068,,,7
+covina-high-school-covina,Covina High School,Covina,school,34.07941,-117.90135,,,8
+covina-park-covina,Covina Park,Covina,park,34.08794,-117.89553,,,2
+kahler-russell-park-covina,Kahler Russell Park,Covina,park,34.09350,-117.86559,,,1
+cudahy-park-cudahy,Cudahy Park,Cudahy,park,33.95845,-118.17484,,,1
+culver-west-park-culver-city,Culver West Park,Culver City,park,33.99333,-118.43446,,,1
+fox-hills-park-culver-city,Fox Hills Park,Culver City,park,33.98402,-118.38602,,,3
+lindberg-park-culver-city,Lindberg Park,Culver City,park,34.00282,-118.39843,,,1
+syd-kronenthal-park-culver-city,Syd Kronenthal Park,Culver City,park,34.02844,-118.37694,,,3
+veterans-memorial-park-culver-city,Veterans Memorial Park,Culver City,park,34.01173,-118.40310,,,2
+cypress-college-cypress,Cypress College,Cypress,college,33.82503,-118.02174,,,10
+cypress-high-school-cypress,Cypress High School,Cypress,school,33.82190,-118.02983,,,6
+juliet-morris-elementary-school-cypress,Juliet Morris Elementary School,Cypress,school,33.81873,-118.03224,,,3
+lexington-junior-high-school-cypress,Lexington Junior High School,Cypress,school,33.82564,-118.05864,,,6
+california-state-polytechnic-university-pomona-diamond-bar,"California State Polytechnic University, Pomona",Diamond Bar,college,34.05381,-117.82025,,,10
+chaparral-middle-school-diamond-bar,Chaparral Middle School,Diamond Bar,school,33.99461,-117.81781,,,4
+diamond-bar-high-school-diamond-bar,Diamond Bar High School,Diamond Bar,school,33.98181,-117.84064,,,8
+evergreen-elementary-school-diamond-bar,Evergreen Elementary School,Diamond Bar,school,33.97915,-117.83180,,,8
+maple-hill-park-diamond-bar,Maple Hill Park,Diamond Bar,park,33.99613,-117.82667,,,2
+pantera-park-diamond-bar,Pantera Park,Diamond Bar,park,34.01273,-117.79125,,,2
+ronald-reagan-park-diamond-bar,Ronald Reagan Park,Diamond Bar,park,33.98242,-117.85312,,,3
+south-pointe-middle-school-diamond-bar,South Pointe Middle School,Diamond Bar,school,33.99120,-117.85043,,,9
+downey-high-school-downey,Downey High School,Downey,school,33.94050,-118.12655,,,8
+furman-park-downey,Furman Park,Downey,park,33.95259,-118.13804,,,3
+independence-park-downey,Independence Park,Downey,park,33.91957,-118.12409,,,9
+warren-high-school-downey,Warren High School,Downey,school,33.93785,-118.14115,,,8
+encanto-park-duarte,Encanto Park,Duarte,park,34.14463,-117.93700,,,2
+royal-oaks-park-duarte,Royal Oaks Park,Duarte,park,34.14381,-117.94882,,,2
+eagle-rock-recreation-center-eagle-rock,Eagle Rock Recreation Center,Eagle Rock,park,34.14268,-118.18701,,,3
+mckinnon-family-tennis-center-eagle-rock,McKinnon Family Tennis Center,Eagle Rock,park,34.12863,-118.21348,,,7
+yosemite-recreation-center-eagle-rock,Yosemite Recreation Center,Eagle Rock,park,34.13308,-118.20726,,,2
+eleanor-roosevelt-high-school-eastvale,Eleanor Roosevelt High School,Eastvale,school,33.95530,-117.56808,,,11
+james-c-huber-park-eastvale,James C. Huber Park,Eastvale,park,33.97207,-117.59019,,,2
+mccune-park-eastvale,McCune Park,Eastvale,park,33.95269,-117.58935,,,1
+mountain-view-park-eastvale,Mountain View Park,Eastvale,park,33.95065,-117.59971,,,2
+echo-park-echo-park,Echo Park,Echo Park,park,34.06876,-118.26055,,,6
+los-angeles-police-academy-echo-park,Los Angeles Police Academy,Echo Park,school,34.08335,-118.24172,,,1
+el-cerrito-sports-park-el-cerrito,El Cerrito Sports Park,El Cerrito,park,33.83480,-117.52804,,,2
+arroyo-high-school-el-monte,Arroyo High School,El Monte,school,34.09566,-118.02052,,,8
+mountain-view-high-school-el-monte,Mountain View High School,El Monte,school,34.05261,-118.01106,,,6
+constitution-park-el-segundo,Constitution Park,El Segundo,park,33.92882,-118.39968,,,1
+el-segundo-high-school-el-segundo,El Segundo High School,El Segundo,school,33.92560,-118.41449,,,4
+recreation-park-el-segundo,Recreation Park,El Segundo,park,33.92103,-118.41149,,,6
+emerald-bay-swimming-pool-emerald-bay,Emerald Bay Swimming Pool,Emerald Bay,park,33.55575,-117.80517,,,2
+swanson-park-emerald-bay,Swanson Park,Emerald Bay,park,33.55438,-117.80715,,,3
+balboa-sports-center-encino,Balboa Sports Center,Encino,park,34.17329,-118.50212,,,16
+encino-park-encino,Encino Park,Encino,park,34.16142,-118.50299,,,2
+loren-miller-park-exposition-park,Loren Miller Park,Exposition Park,park,34.03059,-118.30370,,,2
+martin-luther-king-junior-park-exposition-park,Martin Luther King Junior Park,Exposition Park,park,34.01305,-118.30802,,,1
+university-of-southern-california-exposition-park,University of Southern California,Exposition Park,college,34.02325,-118.29060,,,8
+fairfax-senior-high-school-fairfax,Fairfax Senior High School,Fairfax,school,34.08091,-118.35937,,,6
+poinsettia-recreation-center-fairfax,Poinsettia Recreation Center,Fairfax,park,34.08820,-118.34903,,,8
+colonel-leo-h-washington-park-firestone-park,Colonel Leo H Washington Park,Firestone Park,park,33.95778,-118.24369,,,2
+roosevelt-park-firestone-park,Roosevelt Park,Firestone Park,park,33.96831,-118.24169,,,2
+ted-watkins-memorial-park-firestone-park,Ted Watkins Memorial Park,Firestone Park,park,33.94527,-118.24986,,,4
+green-meadows-playground-florence,Green Meadows Playground,Florence,park,33.95625,-118.26882,,,1
+fontana-park-fontana,Fontana Park,Fontana,park,34.15221,-117.46459,,,1
+ellis-park-fountain-valley,Ellis Park,Fountain Valley,park,33.69512,-117.94940,,,2
+fountain-valley-high-school-fountain-valley,Fountain Valley High School,Fountain Valley,school,33.70627,-117.96133,,,13
+fountain-valley-sports-park-fountain-valley,Fountain Valley Sports Park,Fountain Valley,park,33.72715,-117.95318,,,14
+los-amigos-high-school-fountain-valley,Los Amigos High School,Fountain Valley,school,33.72049,-117.92804,,,8
+los-caballeros-fountain-valley,Los Caballeros,Fountain Valley,park,33.71484,-117.92437,,,13
+california-state-university-fullerton-fullerton,California State University Fullerton,Fullerton,college,33.88419,-117.88693,,,12
+craig-regional-park-fullerton,Craig Regional Park,Fullerton,park,33.89400,-117.88592,,,2
+d-russell-parks-junior-high-school-fullerton,D Russell Parks Junior High School,Fullerton,school,33.89029,-117.95327,,,2
+emery-park-fullerton,Emery Park,Fullerton,park,33.88462,-117.97386,,,2
+fullerton-college-fullerton,Fullerton College,Fullerton,college,33.87499,-117.91519,,,8
+fullerton-high-school-fullerton,Fullerton High School,Fullerton,school,33.87714,-117.92139,,,6
+hillcrest-park-fullerton,Hillcrest Park,Fullerton,park,33.88519,-117.92001,,,1
+ladera-vista-junior-high-school-fullerton,Ladera Vista Junior High School,Fullerton,school,33.87225,-117.89659,,,4
+leonard-andrews-tennis-center-fullerton,Leonard Andrews Tennis Center,Fullerton,park,33.89306,-117.92620,,,1
+sunny-hills-high-school-fullerton,Sunny Hills High School,Fullerton,school,33.88556,-117.95400,,,10
+troy-high-school-fullerton,Troy High School,Fullerton,school,33.88042,-117.89128,,,11
+bolsa-grande-high-school-garden-grove,Bolsa Grande High School,Garden Grove,school,33.76297,-117.96539,,,8
+chapman-sports-complex-garden-grove,Chapman Sports Complex,Garden Grove,park,33.78883,-118.01023,,,6
+garden-grove-high-school-garden-grove,Garden Grove High School,Garden Grove,school,33.77941,-117.93561,,,8
+hilton-d-bell-intermediate-school-garden-grove,Hilton D. Bell Intermediate School,Garden Grove,school,33.78448,-118.02094,,,3
+james-irvine-intermediate-school-garden-grove,James Irvine Intermediate School,Garden Grove,school,33.75022,-117.94562,,,2
+magnolia-park-garden-grove,Magnolia Park,Garden Grove,park,33.79745,-117.97464,,,2
+pacifica-high-school-garden-grove,Pacifica High School,Garden Grove,school,33.78301,-118.01555,,,9
+rancho-alamitos-high-school-garden-grove,Rancho Alamitos High School,Garden Grove,school,33.79808,-117.98711,,,9
+santiago-high-school-garden-grove,Santiago High School,Garden Grove,school,33.76385,-117.91634,,,15
+arthur-lee-johnson-memorial-park-gardena,Arthur Lee Johnson Memorial Park,Gardena,park,33.87632,-118.29510,,,4
+athens-park-gardena,Athens Park,Gardena,park,33.91684,-118.28019,,,2
+freeman-park-gardena,Freeman Park,Gardena,park,33.89081,-118.31517,,,1
+jun-pero-serra-high-school-gardena,Junípero Serra High School,Gardena,school,33.89723,-118.31596,,,1
+rowley-memorial-park-gardena,Rowley Memorial Park,Gardena,park,33.91230,-118.31628,,,4
+glassell-park-glassell-park,Glassell Park,Glassell Park,park,34.11562,-118.23386,,,3
+amable-park-glendale,Amable Park,Glendale,park,34.16251,-118.22214,,,1
+dunsmore-park-glendale,Dunsmore Park,Glendale,park,34.23882,-118.25672,,,1
+emerald-isle-park-glendale,Emerald Isle Park,Glendale,park,34.18053,-118.20098,,,2
+fremont-park-glendale,Fremont Park,Glendale,park,34.15742,-118.26823,,,8
+glendale-community-college-glendale,Glendale Community College,Glendale,college,34.16528,-118.22789,,,6
+glenoaks-park-glendale,Glenoaks Park,Glendale,park,34.15256,-118.20966,,,1
+glorietta-park-glendale,Glorietta Park,Glendale,park,34.18800,-118.22752,,,1
+herbert-hoover-high-school-glendale,Herbert Hoover High School,Glendale,school,34.16624,-118.26875,,,4
+maple-park-glendale,Maple Park,Glendale,park,34.13854,-118.24406,,,1
+montrose-community-park-glendale,Montrose Community Park,Glendale,park,34.20192,-118.22461,,,2
+nibley-park-glendale,Nibley Park,Glendale,park,34.16450,-118.23830,,,2
+oakmont-view-park-glendale,Oakmont View Park,Glendale,park,34.20046,-118.24326,,,2
+citrus-college-glendora,Citrus College,Glendora,college,34.13401,-117.88446,,,8
+dawson-avenue-park-glendora,Dawson Avenue Park,Glendora,park,34.11813,-117.86718,,,7
+finkbiner-park-glendora,Finkbiner Park,Glendora,park,34.13822,-117.86115,,,2
+george-manooshian-park-glendora,George Manooshian Park,Glendora,park,34.15012,-117.84706,,,6
+glendora-high-school-glendora,Glendora High School,Glendora,school,34.13572,-117.83388,,,8
+sandburg-middle-school-park-glendora,Sandburg Middle School Park,Glendora,park,34.14211,-117.87739,,,4
+california-state-university-northridge-granada-hills,"California State University, Northridge",Granada Hills,college,34.25238,-118.52793,,,5
+eddleston-park-granada-hills,Eddleston Park,Granada Hills,park,34.28561,-118.53323,,,4
+granada-hills-charter-high-school-granada-hills,Granada Hills Charter High School,Granada Hills,school,34.25987,-118.52591,,,4
+granada-hills-recreation-center-aka-petit-park-granada-hills,Granada Hills Recreation Center aka Petit Park,Granada Hills,park,34.26142,-118.49754,,,3
+oakridge-estate-park-granada-hills,Oakridge Estate Park,Granada Hills,park,34.25619,-118.53980,,,1
+grand-terrace-fitness-park-grand-terrace,Grand Terrace Fitness Park,Grand Terrace,park,34.03682,-117.32550,,,1
+highgrove-community-park-grand-terrace,Highgrove Community Park,Grand Terrace,park,34.01871,-117.32041,,,1
+gardena-senior-high-school-harbor-gateway,Gardena Senior High School,Harbor Gateway,school,33.86865,-118.29749,,,8
+george-washington-preparatory-high-school-hawthorne,George Washington Preparatory High School,Hawthorne,school,33.93733,-118.30279,,,2
+holly-glen-park-hawthorne,Holly Glen Park,Hawthorne,park,33.90819,-118.37169,,,4
+holly-park-hawthorne,Holly Park,Hawthorne,park,33.92299,-118.31576,,,2
+sepulveda-school-hawthorne,Sepulveda School,Hawthorne,school,33.91897,-118.37492,,,4
+clark-stadium-hermosa-beach,Clark Stadium,Hermosa Beach,park,33.86173,-118.39486,,,1
+ernest-e-debs-regional-park-highland-park,Ernest E. Debs Regional Park,Highland Park,park,34.10472,-118.18799,,,1
+franklin-high-school-highland-park,Franklin High School,Highland Park,school,34.11732,-118.19876,,,4
+sycamore-grove-park-highland-park,Sycamore Grove Park,Highland Park,park,34.10140,-118.20147,,,2
+santee-education-complex-historic-south-central,Santee Education Complex,Historic South-Central,school,34.02801,-118.26297,,,4
+hollywood-high-school-hollywood,Hollywood High School,Hollywood,school,34.09919,-118.34107,,,2
+edison-community-park-huntington-beach,Edison Community Park,Huntington Beach,park,33.65245,-117.97315,,,4
+golden-west-college-huntington-beach,Golden West College,Huntington Beach,college,33.73565,-118.00521,,,7
+harbour-view-park-huntington-beach,Harbour View Park,Huntington Beach,park,33.72227,-118.05400,,,2
+huntington-beach-high-school-huntington-beach,Huntington Beach High School,Huntington Beach,school,33.67760,-118.00539,,,12
+lebard-park-huntington-beach,LeBard Park,Huntington Beach,park,33.66509,-117.94948,,,2
+marina-high-school-huntington-beach,Marina High School,Huntington Beach,school,33.73211,-118.02890,,,19
+murdy-park-huntington-beach,Murdy Park,Huntington Beach,park,33.71799,-118.00393,,,4
+ocean-view-high-school-huntington-beach,Ocean View High School,Huntington Beach,school,33.71510,-118.00358,,,12
+pattinson-park-huntington-beach,Pattinson Park,Huntington Beach,park,33.67573,-118.02041,,,15
+terry-park-huntington-beach,Terry Park,Huntington Beach,park,33.69846,-117.99222,,,2
+salt-lake-park-huntington-park,Salt Lake Park,Huntington Park,park,33.97600,-118.20762,,,5
+ashwood-park-inglewood,Ashwood Park,Inglewood,park,33.95806,-118.36851,,,2
+darby-park-inglewood,Darby Park,Inglewood,park,33.95487,-118.33010,,,6
+edward-vincent-jr-park-inglewood,Edward Vincent Jr. Park,Inglewood,park,33.97153,-118.34486,,,9
+inglewood-high-school-inglewood,Inglewood High School,Inglewood,school,33.94111,-118.33135,,,12
+north-park-inglewood,North Park,Inglewood,park,33.98019,-118.34788,,,3
+rogers-park-inglewood,Rogers Park,Inglewood,park,33.96927,-118.36116,,,3
+altair-park-irvine,Altair Park,Irvine,park,33.68199,-117.71137,,,2
+bill-barber-memorial-park-irvine,Bill Barber Memorial Park,Irvine,park,33.68883,-117.82094,,,6
+canyon-creek-park-irvine,Canyon Creek Park,Irvine,park,33.72119,-117.75297,,,2
+citrusglen-park-irvine,Citrusglen Park,Irvine,park,33.72180,-117.74973,,,4
+concordia-university-irvine-irvine,"Concordia University, Irvine",Irvine,college,33.65443,-117.80975,,,4
+cornell-commons-irvine,Cornell Commons,Irvine,park,33.65013,-117.83344,,,2
+cypress-community-park-irvine,Cypress Community Park,Irvine,park,33.69170,-117.76311,,,3
+dave-robins-park-irvine,Dave Robins Park,Irvine,park,33.66012,-117.80812,,,2
+david-sills-lower-peters-canyon-park-irvine,David Sills Lower Peters Canyon Park,Irvine,park,33.71511,-117.77903,,,10
+eastwood-neighborhood-park-irvine,Eastwood Neighborhood Park,Irvine,park,33.71659,-117.74992,,,2
+egret-park-irvine,Egret Park,Irvine,park,33.70719,-117.74611,,,2
+forest-glen-park-irvine,Forest Glen Park,Irvine,park,33.72983,-117.76903,,,4
+great-park-sports-complex-irvine,Great Park Sports Complex,Irvine,park,33.67611,-117.73658,,,28
+greenfield-park-irvine,Greenfield Park,Irvine,park,33.68900,-117.71207,,,2
+heritage-park-irvine,Heritage Park,Irvine,park,33.70234,-117.77907,,,12
+hoeptner-park-irvine,Hoeptner Park,Irvine,park,33.68590,-117.77591,,,2
+homestead-park-irvine,Homestead Park,Irvine,park,33.73020,-117.78033,,,3
+irvine-valley-college-irvine,Irvine Valley College,Irvine,college,33.67323,-117.77743,,,8
+knollcrest-park-irvine,Knollcrest Park,Irvine,park,33.64878,-117.77368,,,2
+las-lomas-community-park-irvine,Las Lomas Community Park,Irvine,park,33.63077,-117.82942,,,4
+los-olivos-community-park-irvine,Los Olivos Community Park,Irvine,park,33.63638,-117.74672,,,3
+north-lake-park-irvine,North Lake Park,Irvine,park,33.68054,-117.79461,,,10
+northwood-community-park-irvine,Northwood Community Park,Irvine,park,33.71090,-117.76744,,,2
+northwood-courtside-park-irvine,Northwood Courtside Park,Irvine,park,33.70939,-117.77687,,,2
+northwood-high-school-irvine,Northwood High School,Irvine,school,33.73208,-117.75179,,,7
+orangetree-park-irvine,Orangetree Park,Irvine,park,33.67180,-117.77245,,,5
+orchard-trail-park-irvine,Orchard Trail Park,Irvine,park,33.70161,-117.71315,,,1
+portola-high-school-irvine,Portola High School,Irvine,school,33.67299,-117.71034,,,8
+portola-springs-community-park-irvine,Portola Springs Community Park,Irvine,park,33.69738,-117.69892,,,3
+princeton-park-irvine,Princeton Park,Irvine,park,33.65578,-117.84240,,,2
+rancho-san-joaquin-middle-school-irvine,Rancho San Joaquin Middle School,Irvine,school,33.66212,-117.80701,,,3
+ridgeview-park-irvine,Ridgeview Park,Irvine,park,33.70452,-117.71968,,,2
+royal-oak-park-irvine,Royal Oak Park,Irvine,park,33.66654,-117.78731,,,2
+san-carlo-park-irvine,San Carlo Park,Irvine,park,33.68061,-117.82902,,,2
+san-marino-park-irvine,San Marino Park,Irvine,park,33.68014,-117.82025,,,2
+south-lake-park-irvine,South Lake Park,Irvine,park,33.67001,-117.80341,,,10
+stonegate-park-irvine,Stonegate Park,Irvine,park,33.70633,-117.74077,,,2
+timber-run-park-irvine,Timber Run Park,Irvine,park,33.67341,-117.81701,,,2
+trailside-park-irvine,Trailside Park,Irvine,park,33.64723,-117.75319,,,2
+turtle-rock-community-park-irvine,Turtle Rock Community Park,Irvine,park,33.63281,-117.80407,,,4
+turtle-rock-ridge-park-irvine,Turtle Rock Ridge Park,Irvine,park,33.64147,-117.82013,,,3
+turtle-rock-silkwood-park-irvine,Turtle Rock Silkwood Park,Irvine,park,33.63688,-117.79959,,,2
+university-community-park-irvine,University Community Park,Irvine,park,33.66142,-117.81923,,,4
+university-high-school-irvine,University High School,Irvine,school,33.65240,-117.82516,,,9
+university-of-california-irvine-irvine,"University of California, Irvine",Irvine,college,33.64737,-117.84625,,,10
+valley-oak-park-irvine,Valley Oak Park,Irvine,park,33.66651,-117.77510,,,2
+venado-middle-school-irvine,Venado Middle School,Irvine,school,33.69235,-117.79141,,,5
+woodbridge-high-school-tennis-center-irvine,Woodbridge High School Tennis Center,Irvine,park,33.67681,-117.80475,,,9
+woodbury-rec-center-irvine,Woodbury Rec Center,Irvine,park,33.69778,-117.75031,,,4
+woodside-park-irvine,Woodside Park,Irvine,park,33.72016,-117.76626,,,2
+jardin-de-roca-park-irwindale,Jardin de Roca Park,Irwindale,park,34.10489,-117.93606,,,1
+marlborough-school-koreatown,Marlborough School,Koreatown,school,34.07116,-118.32693,,,3
+shatto-recreation-center-koreatown,Shatto Recreation Center,Koreatown,park,34.06738,-118.29018,,,4
+virgil-middle-school-koreatown,Virgil Middle School,Koreatown,school,34.07478,-118.28985,,,6
+crescenta-valley-high-school-la-ca-ada-flintridge,Crescenta Valley High School,La Cañada Flintridge,school,34.22180,-118.24276,,,5
+glenhaven-park-la-ca-ada-flintridge,Glenhaven Park,La Cañada Flintridge,park,34.20943,-118.21960,,,1
+la-ca-ada-high-school-la-ca-ada-flintridge,La Cañada High School,La Cañada Flintridge,school,34.19369,-118.18106,,,7
+la-habra-high-school-la-habra,La Habra High School,La Habra,school,33.93640,-117.95864,,,6
+pathfinder-community-regional-park-la-habra,Pathfinder Community Regional Park,La Habra,park,33.96711,-117.91318,,,2
+portola-park-la-habra,Portola Park,La Habra,park,33.92874,-117.94781,,,8
+biola-university-la-mirada,Biola University,La Mirada,college,33.90255,-118.01732,,,8
+gardenhill-park-la-mirada,Gardenhill Park,La Mirada,park,33.91007,-118.02491,,,2
+la-mirada-community-regional-park-la-mirada,La Mirada Community Regional Park,La Mirada,park,33.90568,-118.00633,,,14
+la-mirada-high-school-la-mirada,La Mirada High School,La Mirada,school,33.90969,-118.00356,,,7
+neff-park-la-mirada,Neff Park,La Mirada,park,33.89871,-118.02732,,,1
+central-park-la-palma,Central Park,La Palma,park,33.84872,-118.03908,,,2
+john-f-kennedy-high-school-la-palma,John F Kennedy High School,La Palma,school,33.83933,-118.03918,,,8
+walker-junior-high-school-la-palma,Walker Junior High School,La Palma,school,33.84244,-118.03471,,,6
+glen-a-wilson-high-school-la-puente,Glen A. Wilson High School,La Puente,school,33.99926,-117.94511,,,6
+peter-f-schabarum-regional-county-park-la-puente,Peter F Schabarum Regional County Park,La Puente,park,33.98385,-117.92758,,,2
+steinmetz-park-la-puente,Steinmetz Park,La Puente,park,34.00186,-117.96071,,,2
+damien-high-school-la-verne,Damien High School,La Verne,school,34.10382,-117.78835,,,8
+ladera-park-ladera-heights,Ladera Park,Ladera Heights,park,33.98458,-118.35921,,,2
+founder-s-park-ladera-ranch,Founder's Park,Ladera Ranch,park,33.55045,-117.63787,,,3
+alta-laguna-park-laguna-beach,Alta Laguna Park,Laguna Beach,park,33.55583,-117.75877,,,5
+swanson-park-laguna-beach,Swanson Park,Laguna Beach,park,33.55206,-117.80711,,,1
+laguna-hills-high-school-laguna-hills,Laguna Hills High School,Laguna Hills,school,33.59212,-117.70415,,,8
+laguna-village-park-laguna-hills,Laguna Village Park,Laguna Hills,park,33.62319,-117.74153,,,3
+mackenzie-park-laguna-hills,Mackenzie Park,Laguna Hills,park,33.59628,-117.68161,,,1
+san-remo-park-laguna-hills,San Remo Park,Laguna Hills,park,33.61983,-117.73905,,,1
+santa-vittoria-park-laguna-hills,Santa Vittoria Park,Laguna Hills,park,33.61599,-117.74166,,,1
+laguna-niguel-regional-park-laguna-niguel,Laguna Niguel Regional Park,Laguna Niguel,park,33.55235,-117.71317,,,3
+rolling-hills-park-laguna-niguel,Rolling Hills Park,Laguna Niguel,park,33.55169,-117.68596,,,2
+birmingham-community-charter-high-school-lake-balboa,Birmingham Community Charter High School,Lake Balboa,school,34.18911,-118.50330,,,4
+lakeland-village-middle-school-lake-elsinore,Lakeland Village Middle School,Lake Elsinore,school,33.62911,-117.32501,,,4
+lakeside-high-school-lake-elsinore,Lakeside High School,Lake Elsinore,school,33.67104,-117.38296,,,8
+rosetta-canyon-sports-park-lake-elsinore,Rosetta Canyon Sports Park,Lake Elsinore,park,33.70135,-117.32279,,,2
+serenity-park-lake-elsinore,Serenity Park,Lake Elsinore,park,33.62463,-117.30755,,,1
+temescal-canyon-high-school-lake-elsinore,Temescal Canyon High School,Lake Elsinore,school,33.70029,-117.34720,,,6
+el-toro-high-school-lake-forest,El Toro High School,Lake Forest,school,33.63551,-117.68819,,,9
+el-toro-park-lake-forest,El Toro Park,Lake Forest,park,33.61545,-117.69529,,,2
+foothill-ranch-community-park-lake-forest,Foothill Ranch Community Park,Lake Forest,park,33.67944,-117.65124,,,2
+lake-forest-elementary-school-lake-forest,Lake Forest Elementary School,Lake Forest,school,33.64340,-117.67012,,,1
+montbury-park-lake-forest,Montbury Park,Lake Forest,park,33.64547,-117.66775,,,1
+montessori-on-the-lake-lake-forest,Montessori on the Lake,Lake Forest,school,33.63036,-117.70409,,,1
+mountain-view-park-lake-forest,Mountain View Park,Lake Forest,park,33.62876,-117.71129,,,2
+oaks-tennis-park-lake-forest,Oaks Tennis Park,Lake Forest,park,33.67416,-117.68593,,,2
+pittsford-park-lake-forest,Pittsford Park,Lake Forest,park,33.64806,-117.67145,,,2
+portola-hills-elementary-school-lake-forest,Portola Hills Elementary School,Lake Forest,school,33.68081,-117.63241,,,1
+rimgate-park-lake-forest,Rimgate Park,Lake Forest,park,33.64480,-117.67831,,,1
+serrano-creek-park-lake-forest,Serrano Creek Park,Lake Forest,park,33.64876,-117.70580,,,1
+lakeview-terrace-recreation-center-lake-view-terrace,Lakeview Terrace Recreation Center,Lake View Terrace,park,34.27582,-118.37140,,,2
+artesia-high-school-lakewood,Artesia High School,Lakewood,school,33.84529,-118.07653,,,6
+lakewood-high-school-lakewood,Lakewood High School,Lakewood,school,33.83669,-118.12119,,,18
+mayfair-park-lakewood,Mayfair Park,Lakewood,park,33.85837,-118.13287,,,5
+lawndale-high-school-lawndale,Lawndale High School,Lawndale,school,33.89554,-118.36514,,,2
+hazard-park-lincoln-heights,Hazard Park,Lincoln Heights,park,34.06002,-118.20109,,,2
+lincoln-park-lincoln-heights,Lincoln Park,Lincoln Heights,park,34.06768,-118.19914,,,4
+eshelman-elementary-school-lomita,Eshelman Elementary School,Lomita,school,33.78917,-118.31383,,,1
+lomita-park-lomita,Lomita Park,Lomita,park,33.80387,-118.31317,,,2
+atlantic-plaza-park-long-beach,Atlantic Plaza Park,Long Beach,park,33.84989,-118.18222,,,1
+bancroft-middle-school-long-beach,Bancroft Middle School,Long Beach,school,33.84114,-118.12819,,,10
+boeing-fitness-center-bldg2019-long-beach,Boeing Fitness Center bldg2019,Long Beach,park,33.82006,-118.16613,,,3
+bouton-creek-park-long-beach,Bouton Creek Park,Long Beach,park,33.78759,-118.12876,,,1
+california-state-university-long-beach-long-beach,"California State University, Long Beach",Long Beach,college,33.78450,-118.11076,,,12
+channel-view-park-long-beach,Channel View Park,Long Beach,park,33.77475,-118.10429,,,1
+cherry-park-long-beach,Cherry Park,Long Beach,park,33.83888,-118.16829,,,2
+drake-park-long-beach,Drake Park,Long Beach,park,33.77953,-118.20173,,,2
+el-dorado-park-west-long-beach,El Dorado Park West,Long Beach,park,33.80843,-118.09666,,,15
+hamilton-middle-school-long-beach,Hamilton Middle School,Long Beach,school,33.88044,-118.17946,,,12
+heartwell-park-long-beach,Heartwell Park,Long Beach,park,33.83066,-118.12092,,,1
+houghton-park-long-beach,Houghton Park,Long Beach,park,33.87078,-118.18297,,,8
+juan-rodriguez-cabrillo-high-school-long-beach,Juan Rodriguez Cabrillo High School,Long Beach,school,33.79470,-118.22022,,,1
+long-beach-city-college-liberal-arts-campus-long-beach,Long Beach City College Liberal Arts Campus,Long Beach,college,33.83088,-118.13977,,,6
+long-beach-polytechnic-high-school-long-beach,Long Beach Polytechnic High School,Long Beach,school,33.78605,-118.18147,,,6
+los-cerritos-park-long-beach,Los Cerritos Park,Long Beach,park,33.82590,-118.19941,,,2
+marine-vista-park-long-beach,Marine Vista Park,Long Beach,park,33.76891,-118.12821,,,2
+mark-twain-elementary-school-long-beach,Mark Twain Elementary School,Long Beach,school,33.84060,-118.13252,,,6
+millikan-high-school-long-beach,Millikan High School,Long Beach,school,33.80556,-118.11019,,,6
+naples-school-long-beach,Naples School,Long Beach,school,33.75612,-118.12683,,,2
+patrick-henry-elementary-school-long-beach,Patrick Henry Elementary School,Long Beach,school,33.82594,-118.10887,,,4
+perry-lindsey-academy-long-beach,Perry Lindsey Academy,Long Beach,school,33.84714,-118.20052,,,8
+ramona-park-long-beach,Ramona Park,Long Beach,park,33.87294,-118.15383,,,2
+recreation-park-long-beach,Recreation Park,Long Beach,park,33.77948,-118.13869,,,8
+sato-academy-of-math-science-long-beach,Sato Academy of Math & Science,Long Beach,school,33.77914,-118.10458,,,9
+scherer-park-long-beach,Scherer Park,Long Beach,park,33.84456,-118.18697,,,1
+silverado-park-long-beach,Silverado Park,Long Beach,park,33.81428,-118.21301,,,4
+somerset-park-long-beach,Somerset Park,Long Beach,park,33.83214,-118.17390,,,2
+stearns-park-long-beach,Stearns Park,Long Beach,park,33.79852,-118.14034,,,1
+wardlow-park-long-beach,Wardlow Park,Long Beach,park,33.82077,-118.12873,,,1
+whaley-park-long-beach,Whaley Park,Long Beach,park,33.78764,-118.12272,,,1
+woodrow-wilson-high-school-long-beach,Woodrow Wilson High School,Long Beach,school,33.77853,-118.14215,,,8
+laurel-park-los-alamitos,Laurel Park,Los Alamitos,park,33.80418,-118.06262,,,4
+los-alamitos-high-school-los-alamitos,Los Alamitos High School,Los Alamitos,school,33.81310,-118.07041,,,8
+richard-henry-lee-elementary-school-los-alamitos,Richard Henry Lee Elementary School,Los Alamitos,school,33.79672,-118.08269,,,2
+rossmoor-park-los-alamitos,Rossmoor Park,Los Alamitos,park,33.79958,-118.07683,,,4
+briarwood-park-los-angeles,Briarwood Park,Los Angeles,park,34.11914,-118.44230,,,1
+california-state-university-los-angeles-los-angeles,California State University Los Angeles,Los Angeles,college,34.06424,-118.16620,,,6
+el-camino-real-charter-high-school-los-angeles,El Camino Real Charter High School,Los Angeles,school,34.17192,-118.64433,,,4
+el-cariso-park-los-angeles,El Cariso Park,Los Angeles,park,34.31739,-118.41699,,,10
+james-boon-lankershim-memorial-los-angeles,James Boon Lankershim Memorial,Los Angeles,park,34.12847,-118.36517,,,3
+mirman-school-los-angeles,Mirman School,Los Angeles,school,34.13108,-118.48252,,,1
+rio-de-los-angeles-state-park-los-angeles,Rio de Los Angeles State Park,Los Angeles,park,34.10074,-118.23668,,,2
+rolling-hills-preparatory-school-los-angeles,Rolling Hills Preparatory School,Los Angeles,school,33.77838,-118.30330,,,2
+saint-bernard-high-school-los-angeles,Saint Bernard High School,Los Angeles,school,33.95405,-118.43517,,,1
+griffith-park-pool-los-feliz,Griffith Park Pool,Los Feliz,park,34.11686,-118.27015,,,12
+los-angeles-city-college-los-feliz,Los Angeles City College,Los Feliz,college,34.08477,-118.29340,,,1
+lynwood-park-lynwood,Lynwood Park,Lynwood,park,33.92706,-118.20320,,,4
+live-oak-park-manhattan-beach,Live Oak Park,Manhattan Beach,park,33.89021,-118.41067,,,6
+manhattan-beach-middle-school-manhattan-beach,Manhattan Beach Middle School,Manhattan Beach,school,33.89020,-118.38365,,,6
+manhattan-heights-park-manhattan-beach,Manhattan Heights Park,Manhattan Beach,park,33.88683,-118.38336,,,2
+mira-costa-high-school-manhattan-beach,Mira Costa High School,Manhattan Beach,school,33.87397,-118.39109,,,12
+glen-alla-park-mar-vista,Glen Alla Park,Mar Vista,park,33.98375,-118.43109,,,2
+mark-twain-middle-school-mar-vista,Mark Twain Middle School,Mar Vista,school,34.00187,-118.44611,,,5
+penmar-recreation-center-mar-vista,Penmar Recreation Center,Mar Vista,park,34.00718,-118.45628,,,6
+los-angeles-center-for-enriched-studies-mid-city,Los Angeles Center for Enriched Studies,Mid-City,school,34.04573,-118.37207,,,5
+los-angeles-senior-high-school-mid-wilshire,Los Angeles Senior High School,Mid-Wilshire,school,34.05396,-118.33260,,,5
+queen-anne-recreation-center-mid-wilshire,Queen Anne Recreation Center,Mid-Wilshire,park,34.05150,-118.33200,,,4
+third-street-elementary-school-mid-wilshire,Third Street Elementary School,Mid-Wilshire,school,34.07083,-118.33384,,,1
+cordova-park-mission-viejo,Cordova Park,Mission Viejo,park,33.57265,-117.65625,,,5
+marguerite-m-o-neill-park-mission-viejo,Marguerite M. O'Neill Park,Mission Viejo,park,33.60145,-117.67017,,,2
+mission-viejo-high-school-mission-viejo,Mission Viejo High School,Mission Viejo,school,33.59603,-117.67240,,,2
+saddleback-college-mission-viejo,Saddleback College,Mission Viejo,college,33.55034,-117.66308,,,6
+sycamore-park-mission-viejo,Sycamore Park,Mission Viejo,park,33.60841,-117.69074,,,2
+trabuco-hills-high-school-mission-viejo,Trabuco Hills High School,Mission Viejo,school,33.65546,-117.65113,,,1
+vista-del-lago-park-mission-viejo,Vista Del Lago Park,Mission Viejo,park,33.63264,-117.64775,,,2
+monrovia-high-school-monrovia,Monrovia High School,Monrovia,school,34.14824,-118.01818,,,9
+recreation-park-monrovia,Recreation Park,Monrovia,park,34.14537,-117.98886,,,4
+la-merced-intermediate-school-montebello,La Merced Intermediate School,Montebello,school,34.01998,-118.09229,,,3
+montebello-high-school-montebello,Montebello High School,Montebello,school,34.01801,-118.12317,,,4
+schurr-high-school-montebello,Schurr High School,Montebello,school,34.02842,-118.12213,,,8
+montecito-heights-recreation-center-montecito-heights,Montecito Heights Recreation Center,Montecito Heights,park,34.09586,-118.20422,,,2
+wilson-high-school-montecito-heights,Wilson High School,Montecito Heights,school,34.06867,-118.18453,,,5
+barnes-memorial-park-monterey-park,Barnes Memorial Park,Monterey Park,park,34.05863,-118.12708,,,3
+belvedere-park-monterey-park,Belvedere Park,Monterey Park,park,34.03847,-118.15908,,,2
+city-terrace-park-monterey-park,City Terrace Park,Monterey Park,park,34.05059,-118.17833,,,1
+garvey-ranch-park-monterey-park,Garvey Ranch Park,Monterey Park,park,34.05178,-118.11317,,,2
+george-e-elder-park-monterey-park,George E Elder Park,Monterey Park,park,34.04042,-118.12381,,,4
+highlands-park-monterey-park,Highlands Park,Monterey Park,park,34.05860,-118.15314,,,2
+richard-garvey-intermediate-school-monterey-park,Richard Garvey Intermediate School,Monterey Park,school,34.06185,-118.10231,,,2
+sequoia-park-monterey-park,Sequoia Park,Monterey Park,park,34.05378,-118.14205,,,2
+sunnyslopes-park-monterey-park,Sunnyslopes Park,Monterey Park,park,34.04620,-118.15146,,,2
+bonita-canyon-sports-park-west-newport-beach,Bonita Canyon Sports Park West,Newport Beach,park,33.62765,-117.86068,,,2
+corona-del-mar-high-school-newport-beach,Corona del Mar High School,Newport Beach,school,33.63475,-117.87767,,,8
+grant-howald-park-newport-beach,Grant Howald Park,Newport Beach,park,33.60253,-117.87079,,,2
+harbor-view-nature-park-newport-beach,Harbor View Nature Park,Newport Beach,park,33.61294,-117.85980,,,1
+mariners-park-newport-beach,Mariners Park,Newport Beach,park,33.63322,-117.90319,,,2
+newport-coast-elementary-school-newport-beach,Newport Coast Elementary School,Newport Beach,school,33.60466,-117.82621,,,3
+newport-harbor-high-school-newport-beach,Newport Harbor High School,Newport Beach,school,33.62434,-117.91206,,,8
+sage-hill-school-newport-beach,Sage Hill School,Newport Beach,school,33.61774,-117.82434,,,6
+san-joaquin-hills-park-lawn-bowling-center-newport-beach,San Joaquin Hills Park & Lawn Bowling Center,Newport Beach,park,33.60840,-117.86390,,,5
+west-newport-park-newport-beach,West Newport Park,Newport Beach,park,33.62465,-117.94610,,,4
+kips-korner-park-norco,Kips Korner Park,Norco,park,33.91187,-117.58082,,,1
+norco-high-school-norco,Norco High School,Norco,school,33.91003,-117.54484,,,8
+norco-intermediate-school-norco,Norco Intermediate School,Norco,school,33.91968,-117.54403,,,4
+balboa-elementary-school-north-hills,Balboa Elementary School,North Hills,school,34.24818,-118.50480,,,2
+dearborn-park-north-hills,Dearborn Park,North Hills,park,34.23683,-118.50766,,,2
+james-monroe-high-school-north-hills,James Monroe High School,North Hills,school,34.23749,-118.47981,,,4
+oliver-wendell-holmes-middle-school-north-hills,Oliver Wendell Holmes Middle School,North Hills,school,34.24045,-118.50699,,,15
+sepulveda-middle-school-north-hills,Sepulveda Middle School,North Hills,school,34.24028,-118.46680,,,12
+north-hollywood-recreation-center-north-hollywood,North Hollywood Recreation Center,North Hollywood,park,34.16634,-118.37983,,,5
+victory-vineland-recreation-center-north-hollywood,Victory-Vineland Recreation Center,North Hollywood,park,34.18782,-118.37308,,,1
+california-state-university-northridge-northridge,"California State University, Northridge",Northridge,college,34.24416,-118.52403,,,18
+northridge-park-northridge,Northridge Park,Northridge,park,34.25272,-118.53369,,,5
+cerritos-college-norwalk,Cerritos College,Norwalk,college,33.88655,-118.09251,,,12
+corvallis-middle-school-norwalk,Corvallis Middle School,Norwalk,school,33.90515,-118.09743,,,5
+gerdes-park-norwalk,Gerdes Park,Norwalk,park,33.89792,-118.08975,,,1
+john-h-glenn-high-school-norwalk,John H. Glenn High School,Norwalk,school,33.90617,-118.05460,,,8
+norwalk-high-school-norwalk,Norwalk High School,Norwalk,school,33.90556,-118.08975,,,8
+celebration-park-south-ontario,Celebration Park South,Ontario,park,33.98326,-117.58945,,,1
+the-ontario-center-school-ontario,The Ontario Center School,Ontario,school,34.07333,-117.57961,,,1
+broadmoor-park-orange,Broadmoor Park,Orange,park,33.79922,-117.77315,,,4
+cal-raceway-orange,Cal Raceway,Orange,park,33.82343,-117.84164,,,2
+chapman-university-orange,Chapman University,Orange,college,33.79109,-117.85698,,,7
+el-camino-real-park-orange,El Camino Real Park,Orange,park,33.79447,-117.87000,,,6
+el-modena-high-school-orange,El Modena High School,Orange,school,33.79055,-117.81343,,,10
+hart-park-orange,Hart Park,Orange,park,33.77802,-117.85205,,,2
+orange-high-school-orange,Orange High School,Orange,school,33.79826,-117.84835,,,9
+santiago-oaks-regional-park-orange,Santiago Oaks Regional Park,Orange,park,33.82264,-117.78015,,,1
+steve-ambriz-memorial-park-orange,Steve Ambriz Memorial Park,Orange,park,33.83769,-117.85693,,,2
+palisades-charter-high-school-pacific-palisades,Palisades Charter High School,Pacific Palisades,school,34.04869,-118.53074,,,2
+palisades-recreation-center-pacific-palisades,Palisades Recreation Center,Pacific Palisades,park,34.04142,-118.52412,,,10
+rustic-canyon-recreation-center-pacific-palisades,Rustic Canyon Recreation Center,Pacific Palisades,park,34.03906,-118.51431,,,6
+westside-waldorf-school-pacific-palisades,Westside Waldorf School,Pacific Palisades,school,34.04075,-118.55241,,,1
+ritchie-valens-park-pacoima,Ritchie Valens Park,Pacoima,park,34.26619,-118.43877,,,2
+san-fernando-senior-high-school-pacoima,San Fernando Senior High School,Pacoima,school,34.27174,-118.44535,,,4
+alexander-hamilton-high-school-palms,Alexander Hamilton High School,Palms,school,34.03323,-118.39338,,,4
+mar-vista-recreation-center-palms,Mar Vista Recreation Center,Palms,park,34.01874,-118.42607,,,6
+montemalaga-elementary-school-palos-verdes-estates,Montemalaga Elementary School,Palos Verdes Estates,school,33.79039,-118.39696,,,1
+palos-verdes-high-school-palos-verdes-estates,Palos Verdes High School,Palos Verdes Estates,school,33.77939,-118.42052,,,7
+palos-verdes-intermediate-school-palos-verdes-estates,Palos Verdes Intermediate School,Palos Verdes Estates,school,33.77774,-118.41273,,,9
+plaza-blanca-palos-verdes-estates,Plaza Blanca,Palos Verdes Estates,park,33.77650,-118.40383,,,1
+panorama-park-panorama-city,Panorama Park,Panorama City,park,34.22820,-118.44120,,,4
+robert-fulton-college-preperatory-panorama-city,Robert Fulton College Preperatory,Panorama City,school,34.20652,-118.45949,,,5
+sepulveda-recreation-center-panorama-city,Sepulveda Recreation Center,Panorama City,park,34.22869,-118.45803,,,5
+east-rancho-dominguez-county-park-paramount,East Rancho Dominguez County Park,Paramount,park,33.89588,-118.19263,,,2
+manuel-dominguez-high-school-paramount,Manuel Dominguez High School,Paramount,school,33.89292,-118.18397,,,8
+blair-high-school-pasadena,Blair High School,Pasadena,school,34.12372,-118.14542,,,5
+brenner-park-pasadena,Brenner Park,Pasadena,park,34.16066,-118.15557,,,1
+brookside-park-pasadena,Brookside Park,Pasadena,park,34.15225,-118.16460,,,5
+california-institute-of-technology-pasadena,California Institute of Technology,Pasadena,college,34.13583,-118.12432,,,13
+hamilton-park-pasadena,Hamilton Park,Pasadena,park,34.16309,-118.07446,,,2
+john-muir-high-school-pasadena,John Muir High School,Pasadena,school,34.17990,-118.16369,,,10
+mayfield-senior-school-pasadena,Mayfield Senior School,Pasadena,school,34.13011,-118.16337,,,2
+mckinley-school-pasadena,McKinley School,Pasadena,school,34.13827,-118.13628,,,3
+pasadena-city-college-pasadena,Pasadena City College,Pasadena,college,34.14401,-118.12097,,,7
+pasadena-high-school-pasadena,Pasadena High School,Pasadena,school,34.16275,-118.09546,,,10
+thurgood-marshal-secondary-school-pasadena,Thurgood Marshal Secondary School,Pasadena,school,34.16295,-118.11058,,,6
+tournament-park-pasadena,Tournament Park,Pasadena,park,34.13296,-118.12411,,,1
+washington-park-pasadena,Washington Park,Pasadena,park,34.16861,-118.13616,,,2
+wilson-intermediate-school-pasadena,Wilson Intermediate School,Pasadena,school,34.14013,-118.08130,,,5
+itennis-pasadena-pasadena,iTennis Pasadena,Pasadena,park,34.14238,-118.12488,,,3
+el-rancho-high-school-pico-rivera,El Rancho High School,Pico Rivera,school,33.98506,-118.09044,,,12
+katherine-edwards-middle-school-pico-rivera,Katherine Edwards Middle School,Pico Rivera,school,33.98159,-118.06891,,,3
+pioneer-high-school-pico-rivera,Pioneer High School,Pico Rivera,school,33.96778,-118.08155,,,6
+cheviot-hills-recreation-center-pico-robertson,Cheviot Hills Recreation Center,Pico-Robertson,park,34.04391,-118.40675,,,14
+lopez-elementary-school-pomona,Lopez Elementary School,Pomona,school,34.05385,-117.76220,,,1
+westmont-park-pomona,Westmont Park,Pomona,park,34.04836,-117.78357,,,1
+egremont-elementary-school-porter-ranch,Egremont Elementary School,Porter Ranch,school,34.25762,-118.56583,,,1
+limekiln-canyon-park-porter-ranch,Limekiln Canyon Park,Porter Ranch,park,34.29057,-118.55684,,,6
+moonshine-canyon-park-porter-ranch,Moonshine Canyon Park,Porter Ranch,park,34.28531,-118.56352,,,2
+alta-loma-elementary-school-rancho-cucamonga,Alta Loma Elementary School,Rancho Cucamonga,school,34.12650,-117.59534,,,1
+bear-gulch-elementary-school-rancho-cucamonga,Bear Gulch Elementary School,Rancho Cucamonga,school,34.10291,-117.60987,,,1
+central-elementary-school-rancho-cucamonga,Central Elementary School,Rancho Cucamonga,school,34.11126,-117.59060,,,2
+central-school-district-rancho-cucamonga,Central School District,Rancho Cucamonga,school,34.10178,-117.57035,,,2
+etiwanda-colony-elementary-school-rancho-cucamonga,Etiwanda Colony Elementary School,Rancho Cucamonga,school,34.14599,-117.51922,,,1
+vineyard-junior-high-school-rancho-cucamonga,Vineyard Junior High School,Rancho Cucamonga,school,34.13678,-117.58226,,,1
+ladera-linda-park-rancho-palos-verdes,Ladera Linda Park,Rancho Palos Verdes,park,33.73854,-118.34945,,,1
+miraleste-early-learning-academy-rancho-palos-verdes,Miraleste Early Learning Academy,Rancho Palos Verdes,school,33.75244,-118.32465,,,1
+miraleste-intermediate-school-rancho-palos-verdes,Miraleste Intermediate School,Rancho Palos Verdes,school,33.75519,-118.32991,,,3
+point-vicente-park-and-civic-center-rancho-palos-verdes,Point Vicente Park and Civic Center,Rancho Palos Verdes,park,33.74474,-118.40037,,,13
+shoreline-park-rancho-palos-verdes,Shoreline Park,Rancho Palos Verdes,park,33.72688,-118.33810,,,2
+ucla-south-bay-rancho-palos-verdes,UCLA South Bay,Rancho Palos Verdes,college,33.73425,-118.33210,,,4
+altisima-park-rancho-santa-margarita,Altisima Park,Rancho Santa Margarita,park,33.65957,-117.61845,,,1
+arroyo-vista-park-rancho-santa-margarita,Arroyo Vista Park,Rancho Santa Margarita,park,33.62547,-117.61345,,,3
+cielo-vista-park-rancho-santa-margarita,Cielo Vista Park,Rancho Santa Margarita,park,33.64507,-117.58764,,,2
+country-hollow-lane-park-rancho-santa-margarita,Country Hollow Lane Park,Rancho Santa Margarita,park,33.65494,-117.57315,,,1
+dove-canyon-community-park-rancho-santa-margarita,Dove Canyon Community Park,Rancho Santa Margarita,park,33.63776,-117.56770,,,4
+monte-vista-rancho-santa-margarita,Monte Vista,Rancho Santa Margarita,park,33.64743,-117.59290,,,2
+santa-margarita-catholic-high-school-rancho-santa-margarita,Santa Margarita Catholic High School,Rancho Santa Margarita,school,33.64384,-117.57937,,,6
+trabuco-mesa-park-rancho-santa-margarita,Trabuco Mesa Park,Rancho Santa Margarita,park,33.65498,-117.57962,,,3
+alta-vista-park-redondo-beach,Alta Vista Park,Redondo Beach,park,33.83154,-118.37941,,,8
+glenn-m-anderson-park-redondo-beach,Glenn M. Anderson Park,Redondo Beach,park,33.88345,-118.37177,,,2
+redondo-union-high-school-redondo-beach,Redondo Union High School,Redondo Beach,school,33.84650,-118.38023,,,12
+cleveland-charter-high-school-reseda,Cleveland Charter High School,Reseda,school,34.21630,-118.54785,,,4
+reseda-charter-high-school-reseda,Reseda Charter High School,Reseda,school,34.18885,-118.52781,,,4
+reseda-park-and-recreation-center-reseda,Reseda Park and Recreation Center,Reseda,park,34.18721,-118.53299,,,4
+sherman-oaks-center-for-enriched-studies-reseda,Sherman Oaks Center for Enriched Studies,Reseda,school,34.18632,-118.53709,,,2
+eisenhower-high-school-rialto,Eisenhower High School,Rialto,school,34.12454,-117.37684,,,7
+kolb-middle-school-rialto,Kolb Middle School,Rialto,school,34.14281,-117.38617,,,2
+rialto-city-park-rialto,Rialto City Park,Rialto,park,34.07911,-117.36944,,,2
+a-d-shamel-park-riverside,A D Shamel Park,Riverside,park,33.94446,-117.39465,,,2
+andulka-park-riverside,Andulka Park,Riverside,park,33.95958,-117.34943,,,9
+arlington-high-school-riverside,Arlington High School,Riverside,school,33.91519,-117.42670,,,8
+california-baptist-university-riverside,California Baptist University,Riverside,college,33.92570,-117.42676,,,2
+california-school-for-the-deaf-riverside,California School for the Deaf,Riverside,school,33.94507,-117.38166,,,2
+fairmount-park-riverside,Fairmount Park,Riverside,park,33.99496,-117.37157,,,2
+hillcrest-high-school-riverside,Hillcrest High School,Riverside,school,33.88847,-117.48968,,,1
+john-bryant-park-riverside,John Bryant Park,Riverside,park,33.93797,-117.46081,,,2
+john-w-north-high-school-riverside,John W North High School,Riverside,school,33.97996,-117.34624,,,8
+la-sierra-high-school-riverside,La Sierra High School,Riverside,school,33.91027,-117.47808,,,8
+la-sierra-university-campus-riverside,La Sierra University Campus,Riverside,college,33.91319,-117.49871,,,5
+martin-luther-king-high-school-riverside,Martin Luther King High School,Riverside,school,33.88511,-117.33320,,,8
+mount-rubidoux-park-riverside,Mount Rubidoux Park,Riverside,park,33.98144,-117.39154,,,1
+norte-vista-high-school-riverside,Norte Vista High School,Riverside,school,33.95086,-117.47662,,,8
+ramona-high-school-riverside,Ramona High School,Riverside,school,33.93966,-117.41381,,,8
+reid-park-riverside,Reid Park,Riverside,park,34.01319,-117.35346,,,3
+riverside-city-college-riverside,Riverside City College,Riverside,college,33.97064,-117.37805,,,14
+riverside-polytechnic-high-school-riverside,Riverside Polytechnic High School,Riverside,school,33.95324,-117.36780,,,1
+sherman-indian-high-school-riverside,Sherman Indian High School,Riverside,school,33.92271,-117.43325,,,6
+swanson-park-riverside,Swanson Park,Riverside,park,33.94951,-117.35649,,,8
+taft-park-riverside,Taft Park,Riverside,park,33.92736,-117.33350,,,2
+thundersky-park-riverside,Thundersky Park,Riverside,park,33.89148,-117.30385,,,2
+university-of-california-riverside-riverside,"University of California, Riverside",Riverside,college,33.97851,-117.32821,,,9
+peninsula-heritage-school-rolling-hills,Peninsula Heritage School,Rolling Hills,school,33.77603,-118.34448,,,2
+westfield-park-rolling-hills,Westfield Park,Rolling Hills,park,33.76796,-118.36075,,,2
+ernie-j-howlett-park-rolling-hills-estates,Ernie J Howlett Park,Rolling Hills Estates,park,33.79234,-118.35363,,,8
+palos-verdes-peninsula-high-school-rolling-hills-estates,Palos Verdes Peninsula High School,Rolling Hills Estates,school,33.78212,-118.37286,,,6
+ridgecrest-intermediate-school-rolling-hills-estates,Ridgecrest Intermediate School,Rolling Hills Estates,school,33.76507,-118.38153,,,1
+garvey-park-rosemead,Garvey Park,Rosemead,park,34.06686,-118.09735,,,5
+rosemead-high-school-rosemead,Rosemead High School,Rosemead,school,34.08600,-118.07210,,,6
+arroyo-valley-high-school-san-bernardino,Arroyo Valley High School,San Bernardino,school,34.11792,-117.32561,,,8
+blair-park-san-bernardino,Blair Park,San Bernardino,park,34.15095,-117.31731,,,1
+bobby-vega-park-san-bernardino,Bobby Vega Park,San Bernardino,park,34.11543,-117.31221,,,2
+cajon-high-school-san-bernardino,Cajon High School,San Bernardino,school,34.17711,-117.31113,,,1
+california-state-university-san-bernardino-san-bernardino,"California State University, San Bernardino",San Bernardino,college,34.18228,-117.31792,,,15
+lytle-creek-park-san-bernardino,Lytle Creek Park,San Bernardino,park,34.09542,-117.31042,,,1
+nunez-park-san-bernardino,Nunez Park,San Bernardino,park,34.10710,-117.32532,,,1
+ladera-serra-park-san-dimas,Ladera Serra Park,San Dimas,park,34.07929,-117.82706,,,2
+lone-hill-park-san-dimas,Lone Hill Park,San Dimas,park,34.11193,-117.83501,,,2
+marchant-park-san-dimas,Marchant Park,San Dimas,park,34.11187,-117.79892,,,2
+pioneer-park-san-dimas,Pioneer Park,San Dimas,park,34.10496,-117.81341,,,2
+pioneer-park-san-fernando,Pioneer Park,San Fernando,park,34.29375,-118.43150,,,2
+roosevelt-elementary-school-san-gabriel,Roosevelt Elementary School,San Gabriel,school,34.09680,-118.08567,,,2
+smith-park-san-gabriel,Smith Park,San Gabriel,park,34.09863,-118.10299,,,1
+washington-elementary-school-san-gabriel,Washington Elementary School,San Gabriel,school,34.10646,-118.10222,,,2
+huntington-middle-school-san-marino,Huntington Middle School,San Marino,school,34.11813,-118.11286,,,3
+k-l-carver-elementary-school-san-marino,K.L. Carver Elementary School,San Marino,school,34.12704,-118.08905,,,2
+lacy-park-san-marino,Lacy Park,San Marino,park,34.12097,-118.12415,,,7
+saints-felicitas-and-perpetua-school-san-marino,Saints Felicitas and Perpetua School,San Marino,school,34.12809,-118.09251,,,1
+san-marino-high-school-san-marino,San Marino High School,San Marino,school,34.12774,-118.09959,,,5
+southwestern-academy-san-marino,Southwestern Academy,San Marino,school,34.11464,-118.13219,,,1
+wilson-elementary-school-san-marino,Wilson Elementary School,San Marino,school,34.11765,-118.08927,,,2
+martin-j-bogdanovich-recreation-center-san-pedro,Martin J Bogdanovich Recreation Center,San Pedro,park,33.73094,-118.31562,,,1
+peck-park-san-pedro,Peck Park,San Pedro,park,33.75111,-118.30598,,,6
+cabrillo-park-santa-ana,Cabrillo Park,Santa Ana,park,33.75187,-117.84096,,,9
+century-high-school-santa-ana,Century High School,Santa Ana,school,33.72925,-117.84545,,,8
+flower-street-park-santa-ana,Flower Street Park,Santa Ana,park,33.74497,-117.87551,,,11
+frances-e-willard-intermediate-school-santa-ana,Frances E Willard Intermediate School,Santa Ana,school,33.75766,-117.87347,,,1
+james-mcfadden-intermediate-school-santa-ana,James McFadden Intermediate School,Santa Ana,school,33.70983,-117.89675,,,6
+jim-thorpe-fundamental-santa-ana,Jim Thorpe Fundamental,Santa Ana,school,33.70278,-117.90302,,,1
+mabury-park-santa-ana,Mabury Park,Santa Ana,park,33.75256,-117.84141,,,1
+morrison-park-santa-ana,Morrison Park,Santa Ana,park,33.77474,-117.87951,,,2
+portola-park-santa-ana,Portola Park,Santa Ana,park,33.76658,-117.84431,,,1
+sandpointe-park-santa-ana,Sandpointe Park,Santa Ana,park,33.69935,-117.87226,,,3
+santa-ana-college-santa-ana,Santa Ana College,Santa Ana,college,33.75700,-117.88950,,,2
+santiago-park-santa-ana,Santiago Park,Santa Ana,park,33.77372,-117.85938,,,3
+segerstrom-high-school-santa-ana,Segerstrom High School,Santa Ana,school,33.70046,-117.90277,,,8
+stephen-r-fitz-intermediate-school-santa-ana,Stephen R Fitz Intermediate School,Santa Ana,school,33.73703,-117.92904,,,2
+valley-high-school-santa-ana,Valley High School,Santa Ana,school,33.72413,-117.89682,,,10
+windsor-park-santa-ana,Windsor Park,Santa Ana,park,33.73110,-117.90796,,,2
+rancho-santa-gertrudes-elementary-school-santa-fe-springs,Rancho Santa Gertrudes Elementary School,Santa Fe Springs,school,33.95627,-118.08099,,,2
+clover-park-santa-monica,Clover Park,Santa Monica,park,34.01649,-118.45667,,,3
+douglas-park-santa-monica,Douglas Park,Santa Monica,park,34.03597,-118.47918,,,4
+hotchkiss-park-santa-monica,Hotchkiss Park,Santa Monica,park,34.00572,-118.48569,,,1
+john-adams-middle-school-santa-monica,John Adams Middle School,Santa Monica,school,34.01273,-118.46938,,,2
+los-amigos-park-santa-monica,Los Amigos Park,Santa Monica,park,34.00666,-118.48166,,,1
+marine-park-santa-monica,Marine Park,Santa Monica,park,34.00514,-118.46640,,,3
+memorial-park-santa-monica,Memorial Park,Santa Monica,park,34.02118,-118.48151,,,4
+ocean-view-park-santa-monica,Ocean View Park,Santa Monica,park,33.99972,-118.48397,,,6
+palisades-park-santa-monica,Palisades Park,Santa Monica,park,34.01994,-118.50729,,,3
+reed-park-santa-monica,Reed Park,Santa Monica,park,34.02216,-118.49540,,,6
+santa-monica-high-school-santa-monica,Santa Monica High School,Santa Monica,school,34.01266,-118.48758,,,6
+santa-susana-park-santa-susana,Santa Susana Park,Santa Susana,park,34.25938,-118.66368,,,1
+stoner-recreation-center-sawtelle,Stoner Recreation Center,Sawtelle,park,34.03844,-118.45484,,,6
+heather-park-seal-beach,Heather Park,Seal Beach,park,33.78088,-118.05235,,,2
+j-h-mcgaugh-elementary-school-seal-beach,J H McGaugh Elementary School,Seal Beach,school,33.74464,-118.09397,,,5
+marina-community-park-seal-beach,Marina Community Park,Seal Beach,park,33.74581,-118.11038,,,1
+seal-beach-tennis-pickleball-center-seal-beach,Seal Beach Tennis & Pickleball Center,Seal Beach,park,33.77531,-118.06321,,,14
+notre-dame-high-school-sherman-oaks,Notre Dame High School,Sherman Oaks,school,34.15920,-118.42863,,,3
+van-nuys-sherman-oaks-war-memorial-park-sherman-oaks,Van Nuys-Sherman Oaks War Memorial Park,Sherman Oaks,park,34.16104,-118.44384,,,16
+sierra-madre-memorial-park-sierra-madre,Sierra Madre Memorial Park,Sierra Madre,park,34.16112,-118.05771,,,2
+sierra-vista-park-sierra-madre,Sierra Vista Park,Sierra Madre,park,34.16334,-118.04092,,,2
+gates-canyon-park-simi-hills,Gates Canyon Park,Simi Hills,park,34.16145,-118.69258,,,2
+simi-valley-high-school-simi-valley,Simi Valley High School,Simi Valley,school,34.27668,-118.68689,,,6
+san-angelo-park-south-el-monte,San Angelo Park,South El Monte,park,34.04951,-118.00274,,,2
+whittier-narrows-recreation-area-special-events-south-el-monte,Whittier Narrows Recreation Area - Special Events,South El Monte,park,34.04396,-118.05761,,,16
+hollydale-regional-park-south-gate,Hollydale Regional Park,South Gate,park,33.92091,-118.17516,,,2
+legacy-high-school-complex-south-gate,Legacy High School Complex,South Gate,school,33.94107,-118.17678,,,4
+south-east-high-school-south-gate,South East High School,South Gate,school,33.94522,-118.22131,,,4
+south-gate-park-south-gate,South Gate Park,South Gate,park,33.94732,-118.18644,,,6
+eddie-park-south-pasadena,Eddie Park,South Pasadena,park,34.10849,-118.14295,,,4
+orange-grove-park-south-pasadena,Orange Grove Park,South Pasadena,park,34.11502,-118.16006,,,3
+san-pascual-park-south-pasadena,San Pascual Park,South Pasadena,park,34.11669,-118.16897,,,10
+south-pasadena-high-school-south-pasadena,South Pasadena High School,South Pasadena,school,34.10865,-118.15616,,,4
+south-pasadena-middle-school-south-pasadena,South Pasadena Middle School,South Pasadena,school,34.10976,-118.14798,,,2
+tennis-courts-south-pasadena,Tennis Courts,South Pasadena,park,34.11811,-118.14632,,,3
+stanton-central-park-stanton,Stanton Central Park,Stanton,park,33.80692,-118.00064,,,5
+crean-lutheran-high-school-sports-facility-stonegate,Crean Lutheran High School Sports Facility,Stonegate,school,33.70787,-117.73213,,,6
+studio-city-recreation-center-studio-city,Studio City Recreation Center,Studio City,park,34.15244,-118.40762,,,4
+sun-valley-park-sun-valley,Sun Valley Park,Sun Valley,park,34.21860,-118.37296,,,1
+sunland-recreation-center-sunland,Sunland Recreation Center,Sunland,park,34.26119,-118.32354,,,2
+verdugo-hills-high-school-sunland,Verdugo Hills High School,Sunland,school,34.26044,-118.30051,,,4
+sylmar-park-sylmar,Sylmar Park,Sylmar,park,34.30834,-118.44720,,,2
+schwarzenegger-community-school-chime-institute-tarzana,Schwarzenegger Community School (CHIME Institute),Tarzana,school,34.16483,-118.56476,,,3
+tarzana-community-cultural-center-tarzana,Tarzana Community & Cultural Center,Tarzana,park,34.17167,-118.55067,,,1
+deleo-regional-sports-park-temescal-valley,Deleo Regional Sports Park,Temescal Valley,park,33.74575,-117.46469,,,1
+luise-o-elementary-school-temescal-valley,Luiseño Elementary School,Temescal Valley,school,33.72610,-117.42831,,,2
+live-oak-park-temple-city,Live Oak Park,Temple City,park,34.10298,-118.04697,,,6
+temple-city-high-school-temple-city,Temple City High School,Temple City,school,34.11799,-118.06563,,,8
+330-torrance,330,Torrance,park,33.84250,-118.31525,,,4
+bishop-montgomery-high-school-torrance,Bishop Montgomery High School,Torrance,school,33.83658,-118.37406,,,6
+charles-h-wilson-park-torrance,Charles H Wilson Park,Torrance,park,33.82685,-118.32344,,,5
+el-retiro-park-torrance,El Retiro Park,Torrance,park,33.81520,-118.37781,,,2
+hickory-park-torrance,Hickory Park,Torrance,park,33.81800,-118.33498,,,1
+la-romeria-park-torrance,La Romeria Park,Torrance,park,33.85328,-118.36143,,,1
+north-high-school-torrance,North High School,Torrance,school,33.86266,-118.33578,,,9
+paradise-park-torrance,Paradise Park,Torrance,park,33.83524,-118.36399,,,2
+saint-james-school-torrance,Saint James School,Torrance,school,33.84349,-118.36305,,,2
+south-bay-christian-school-torrance,South Bay Christian School,Torrance,school,33.84589,-118.35947,,,16
+south-high-school-torrance,South High School,Torrance,school,33.81207,-118.36260,,,1
+sur-la-brea-park-torrance,Sur La Brea Park,Torrance,park,33.81024,-118.31311,,,2
+walteria-park-torrance,Walteria Park,Torrance,park,33.80498,-118.35290,,,1
+west-high-school-torrance,West High School,Torrance,school,33.84809,-118.37058,,,1
+mcgroarty-park-tujunga,McGroarty Park,Tujunga,park,34.25110,-118.29780,,,1
+columbus-tustin-park-tustin,Columbus Tustin Park,Tustin,park,33.75004,-117.82083,,,4
+hillview-high-school-tustin,Hillview High School,Tustin,school,33.76954,-117.80079,,,6
+magnolia-tree-park-tustin,Magnolia Tree Park,Tustin,park,33.71953,-117.81328,,,3
+red-hill-school-tustin,Red Hill School,Tustin,school,33.75808,-117.79394,,,1
+tustin-high-school-tustin,Tustin High School,Tustin,school,33.73890,-117.81807,,,6
+tustin-sports-park-tustin,Tustin Sports Park,Tustin,park,33.73502,-117.78495,,,6
+veterans-sports-park-tustin,Veterans Sports Park,Tustin,park,33.71590,-117.82681,,,5
+upland-high-school-upland,Upland High School,Upland,school,34.10644,-117.65833,,,9
+los-angeles-valley-college-valley-glen,Los Angeles Valley College,Valley Glen,college,34.17251,-118.41724,,,8
+valley-plaza-park-valley-glen,Valley Plaza Park,Valley Glen,park,34.18900,-118.40033,,,1
+van-nuys-high-school-van-nuys,Van Nuys High School,Van Nuys,school,34.18832,-118.45699,,,4
+van-nuys-recreation-center-van-nuys,Van Nuys Recreation Center,Van Nuys,park,34.19563,-118.44466,,,2
+admiralty-park-venice,Admiralty Park,Venice,park,33.98461,-118.45191,,,7
+venice-beach-boardwalk-venice,Venice Beach Boardwalk,Venice,park,33.98494,-118.47236,,,11
+saint-andrews-recreation-center-vermont-knolls,Saint Andrews Recreation Center,Vermont Knolls,park,33.95965,-118.31161,,,3
+harvard-playground-vermont-square,Harvard Playground,Vermont Square,park,33.98384,-118.30298,,,8
+manual-arts-senior-high-school-vermont-square,Manual Arts Senior High School,Vermont Square,school,34.00897,-118.29296,,,4
+ruben-f-salazar-park-vernon,Ruben F. Salazar Park,Vernon,park,34.02312,-118.19061,,,2
+brentwood-school-athletic-facilities-va-lease-veterans-administration,Brentwood School Athletic Facilities VA lease,Veterans Administration,school,34.06443,-118.46626,,,6
+crenshaw-senior-high-school-view-park-windsor-hills,Crenshaw Senior High School,View Park-Windsor Hills,school,33.99527,-118.32751,,,4
+mount-san-antonio-college-walnut,Mount San Antonio College,Walnut,college,34.04570,-117.83785,,,10
+nogales-high-school-walnut,Nogales High School,Walnut,school,34.01079,-117.88730,,,7
+rowland-heights-park-walnut,Rowland Heights Park,Walnut,park,33.98986,-117.87932,,,2
+walnut-high-school-walnut,Walnut High School,Walnut,school,34.02411,-117.84993,,,8
+walnut-ranch-park-walnut,Walnut Ranch Park,Walnut,park,34.03868,-117.86156,,,3
+taft-charter-high-school-warner-center,Taft Charter High School,Warner Center,school,34.16731,-118.57390,,,4
+jim-gilliam-recreation-center-west-adams,Jim Gilliam Recreation Center,West Adams,park,34.01434,-118.35505,,,4
+michelle-and-barack-obama-sports-complex-west-adams,Michelle and Barack Obama Sports Complex,West Adams,park,34.02220,-118.34975,,,12
+nathaniel-narbonne-high-school-west-carson,Nathaniel Narbonne High School,West Carson,school,33.80247,-118.30556,,,1
+del-norte-park-west-covina,Del Norte Park,West Covina,park,34.07772,-117.93555,,,4
+shadow-oak-park-west-covina,Shadow Oak Park,West Covina,park,34.01953,-117.89754,,,2
+south-hills-high-school-west-covina,South Hills High School,West Covina,school,34.06262,-117.88451,,,2
+st-christopher-schoool-west-covina,St Christopher Schoool,West Covina,school,34.06387,-117.92836,,,1
+telesis-academy-of-science-math-west-covina,Telesis Academy of Science & Math,West Covina,school,34.00560,-117.88423,,,6
+west-covina-high-school-west-covina,West Covina High School,West Covina,school,34.06179,-117.91492,,,1
+hale-middle-school-west-hills,Hale Middle School,West Hills,school,34.17635,-118.64428,,,9
+knapp-ranch-park-west-hills,Knapp Ranch Park,West Hills,park,34.18904,-118.65844,,,4
+plummer-park-west-hollywood,Plummer Park,West Hollywood,park,34.09365,-118.35122,,,7
+west-hollywood-park-west-hollywood,West Hollywood Park,West Hollywood,park,34.08169,-118.38425,,,3
+bluff-creek-fields-westchester,Bluff Creek Fields,Westchester,park,33.97520,-118.41306,,,1
+loyola-marymount-university-westchester,Loyola Marymount University,Westchester,college,33.96818,-118.41445,,,6
+oberrieder-park-westchester,Oberrieder Park,Westchester,park,33.97163,-118.42105,,,1
+steve-soboroff-court-park-westchester,Steve Soboroff Court Park,Westchester,park,33.98271,-118.39978,,,1
+the-sports-park-at-playa-vista-westchester,The Sports Park at Playa Vista,Westchester,park,33.96733,-118.42649,,,2
+westchester-enriched-science-magnets-westchester,Westchester Enriched Science Magnets,Westchester,school,33.95658,-118.43056,,,5
+westchester-park-westchester,Westchester Park,Westchester,park,33.95915,-118.41533,,,10
+bimini-slough-ecology-park-westlake,Bimini Slough Ecology Park,Westlake,park,34.07099,-118.28946,,,1
+miguel-contreras-learning-complex-westlake,Miguel Contreras Learning Complex,Westlake,school,34.05928,-118.26046,,,3
+la-quinta-high-school-westminster,La Quinta High School,Westminster,school,33.73677,-117.95036,,,10
+westminster-high-school-westminster,Westminster High School,Westminster,school,33.75246,-118.01071,,,8
+jesse-owens-community-regional-park-westmont,Jesse Owens Community Regional Park,Westmont,park,33.94823,-118.30941,,,3
+de-neve-square-westwood,De Neve Square,Westwood,park,34.08494,-118.43438,,,3
+harvard-westlake-middle-school-westwood,Harvard-Westlake Middle School,Westwood,school,34.08808,-118.43465,,,5
+los-angeles-tennis-center-westwood,Los Angeles Tennis Center,Westwood,park,34.07007,-118.44829,,,6
+university-of-california-los-angeles-westwood,"University of California, Los Angeles",Westwood,college,34.07304,-118.45121,,,14
+westwood-park-westwood,Westwood Park,Westwood,park,34.05431,-118.44652,,,9
+broadway-park-whittier,Broadway Park,Whittier,park,33.98576,-118.03944,,,2
+california-high-school-whittier,California High School,Whittier,school,33.94148,-118.02147,,,8
+la-serna-high-school-whittier,La Serna High School,Whittier,school,33.95578,-117.99634,,,9
+leffingwell-ranch-park-whittier,Leffingwell Ranch Park,Whittier,park,33.93973,-117.99536,,,4
+palm-park-whittier,Palm Park,Whittier,park,33.99042,-118.05521,,,7
+whittier-college-whittier,Whittier College,Whittier,college,33.97606,-118.02661,,,6
+whittier-high-school-whittier,Whittier High School,Whittier,school,33.98183,-118.04384,,,6
+edwin-markham-middle-school-willowbrook,Edwin Markham Middle School,Willowbrook,school,33.93894,-118.24582,,,4
+banning-high-school-wilmington,Banning High School,Wilmington,school,33.79326,-118.26316,,,8
+banning-park-wilmington,Banning Park,Wilmington,park,33.79100,-118.25680,,,4
+los-angeles-pierce-college-winnetka,Los Angeles Pierce College,Winnetka,college,34.18308,-118.57311,,,9
+runnymede-recreation-center-winnetka,Runnymede Recreation Center,Winnetka,park,34.20526,-118.57285,,,4
+woodland-hills-recreation-center-woodland-hills,Woodland Hills Recreation Center,Woodland Hills,park,34.17546,-118.61268,,,5
+brush-canyon-park-yorba-linda,Brush Canyon Park,Yorba Linda,park,33.87789,-117.70216,,,4
+bryant-ranch-elementary-school-yorba-linda,Bryant Ranch Elementary School,Yorba Linda,school,33.88152,-117.71606,,,1
+las-palomas-park-yorba-linda,Las Palomas Park,Yorba Linda,park,33.88297,-117.77331,,,2
+yorba-linda-high-school-yorba-linda,Yorba Linda High School,Yorba Linda,school,33.89764,-117.79292,,,8

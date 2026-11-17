@@ -619,11 +619,8 @@ dialog.acct::backdrop { background: rgb(15 20 25 / .45); }
 }
 .hero .locbtn:disabled { opacity: .7; cursor: default; }
 .hero .link.inline { background: none; padding: 0; text-decoration: underline; font-size: inherit; margin: 0; }
-/* you, on the map */
-.me-dot {
-  width: 16px; height: 16px; border-radius: 50%; background: #1a73e8; border: 3px solid #fff;
-  box-shadow: 0 0 0 6px rgb(26 115 232 / .22), var(--shadow-sm);
-}
+/* you, on the map: MapLibre's locate control draws the blue dot and accuracy circle */
+.maplibregl-user-location-dot { z-index: 3000000; }   /* above every court pin */
 
 /* ---------- phones: one column, weather first, then the map ---------- */
 @media (max-width: 760px) {
