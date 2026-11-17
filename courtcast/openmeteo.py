@@ -51,6 +51,7 @@ def fetch(points):
             "latitude": ",".join(f"{la:.4f}" for la, _ in chunk),
             "longitude": ",".join(f"{lo:.4f}" for _, lo in chunk),
             "hourly": ",".join(C.HOURLY_VARS),
+            "daily": ",".join(C.DAILY_VARS),
             "models": C.MODEL,
             "past_days": 1,       # the hours before "now", for the wet-court check
             "forecast_days": 3,

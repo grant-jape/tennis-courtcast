@@ -80,6 +80,29 @@ def series(result, start, hours):
     return out
 
 
+def details(result, start, hours):
+    """Weather-panel extras for one court: condition code, feels like, humidity, UV, cloud cover
+    per hour, plus daily highs/lows. Missing variables just come out as empty lists."""
+    h, d = result["hourly"], result.get("daily") or {}
+    get = lambda k: h.get(k) or [None] * len(h["time"])  # noqa: E731
+    pick = lambda k, f: [None if x is None else f(x) for x in get(k)[start:start + hours]]  # noqa: E731
+    return {
+        "wc": pick("weather_code", int),
+        "ft": pick("apparent_temperature", round),
+        "hu": pick("relative_humidity_2m", round),
+        "uv": pick("uv_index", lambda x: round(x, 1)),
+        "cc": pick("cloud_cover", round),
+        "hi": [None if x is None else round(x) for x in d.get("temperature_2m_max", [])],
+        "lo": [None if x is None else round(x) for x in d.get("temperature_2m_min", [])],
+    }
+
+
+def daily(result):
+    """Days (local dates) with sunrise and sunset, region-wide (they differ by seconds across the map)."""
+    d = result.get("daily") or {}
+    return {"date": d.get("time", []), "sunrise": d.get("sunrise", []), "sunset": d.get("sunset", [])}
+
+
 def write_snapshot(courts, results, start, issued, snap_dir):
     """Save today's first forecast for each court (next 24h). Returns path or None."""
     snap_dir.mkdir(parents=True, exist_ok=True)
@@ -119,6 +142,7 @@ def main(argv=None):
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "times": h0["time"][start:start + hours],
         "is_day": h0["is_day"][start:start + hours],
+        "daily": daily(results[0]),
         "bands": {"play": C.GOOD_AT, "iffy": C.IFFY_AT,
                   "wind_iffy": C.WIND_IFFY_GUST, "wind_skip": C.WIND_SKIP_GUST},
         "grid": {"step_lat": C.GRID_STEP_LAT, "step_lon": C.GRID_STEP_LON, "cells": []},
@@ -130,7 +154,7 @@ def main(argv=None):
                                "lat": c["lat"], "lon": c["lon"],
                                # optional "courts" column: how many courts the site has (feeds the "likely busy" guess)
                                "courts": int(c["courts"]) if (c.get("courts") or "").strip().isdigit() else None,
-                               **series(res, start, hours)})
+                               **series(res, start, hours), **details(res, start, hours)})
     for (la, lo), res in zip(grid, grid_res):
         ser = series(res, start, hours)
         data["grid"]["cells"].append({"lat": la, "lon": lo, **{k: ser[k] for k in ("s", "p", "r", "w", "g", "d", "t")}})

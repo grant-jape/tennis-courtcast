@@ -942,10 +942,264 @@
     });
   }
 
-  // ---------- court card ----------
+  // ---------- conditions: WMO weather codes -> words + icons ----------
+  // Open-Meteo reports a WMO "weather code" each hour. Older forecast files don't have it,
+  // so fall back to a guess from rain amount and chance.
+  function condition(code, isDay, p, r) {
+    if (code == null) code = r >= 0.01 ? 61 : r > 0 ? 51 : p >= 60 ? 3 : 0;
+    const day = !!isDay;
+    if (code === 0) return { kind: "clear", label: day ? "Sunny" : "Clear" };
+    if (code === 1) return { kind: "partly", label: day ? "Mostly sunny" : "Mostly clear" };
+    if (code === 2) return { kind: "partly", label: "Partly cloudy" };
+    if (code === 3) return { kind: "cloudy", label: "Cloudy" };
+    if (code === 45 || code === 48) return { kind: "fog", label: "Fog" };
+    if (code >= 51 && code <= 57) return { kind: "drizzle", label: "Drizzle" };
+    if (code === 65 || code === 82) return { kind: "rain", label: "Heavy rain" };
+    if ((code >= 61 && code <= 67) || (code >= 80 && code <= 81)) return { kind: "rain", label: code >= 80 ? "Showers" : "Rain" };
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { kind: "snow", label: "Snow" };
+    if (code >= 95) return { kind: "thunder", label: "Thunderstorms" };
+    return { kind: "cloudy", label: "Cloudy" };
+  }
+  // Small, flat weather icons (sun yellow, cloud gray, rain blue), drawn on a 32x32 grid.
+  const CLOUD = '<path d="M9.5 25h14a5.5 5.5 0 0 0 .6-10.97A7.5 7.5 0 0 0 9.8 15.6 4.75 4.75 0 0 0 9.5 25z" fill="var(--cloud)"/>';
+  const SUNG = (cx, cy, r) => `<g fill="#ffc531"><circle cx="${cx}" cy="${cy}" r="${r}"/></g><g stroke="#ffc531" stroke-width="2" stroke-linecap="round">${
+    [0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+      const c = Math.cos(a * Math.PI / 180), s = Math.sin(a * Math.PI / 180);
+      return `<path d="M${(cx + c * (r + 3)).toFixed(1)} ${(cy + s * (r + 3)).toFixed(1)}L${(cx + c * (r + 5.5)).toFixed(1)} ${(cy + s * (r + 5.5)).toFixed(1)}"/>`;
+    }).join("")}</g>`;
+  const MOONG = (cx, cy, r) => `<path d="M${cx + r * 0.35} ${cy - r}a${r} ${r} 0 1 0 ${r * 0.65} ${r * 1.55} ${r * 0.8} ${r * 0.8} 0 0 1 -${r * 0.65} -${r * 1.55}z" fill="#c9d6ea"/>`;
+  const DROPS = (n) => `<g stroke="#4aa3f0" stroke-width="2.2" stroke-linecap="round">${
+    [[12, 27], [17, 28], [22, 27]].slice(0, n).map(([x, y]) => `<path d="M${x} ${y}l-1.5 3.5"/>`).join("")}</g>`;
+  function wxIcon(kind, day, cls = "wx") {
+    const body = {
+      clear: day ? SUNG(16, 16, 6.5) : MOONG(15, 16, 8),
+      partly: (day ? SUNG(12, 11, 5) : MOONG(11, 10, 6)) + CLOUD,
+      cloudy: `<g opacity=".55" transform="translate(9 -4) scale(.75)">${CLOUD}</g>${CLOUD}`,
+      fog: CLOUD + '<g stroke="var(--cloud)" stroke-width="2.2" stroke-linecap="round"><path d="M6 28.5h20M9 31h14"/></g>',
+      drizzle: CLOUD + DROPS(2),
+      rain: CLOUD + DROPS(3),
+      snow: CLOUD + '<g fill="#dff1ff" stroke="#9cc9ef" stroke-width=".8"><circle cx="12" cy="28.5" r="1.6"/><circle cx="17" cy="30" r="1.6"/><circle cx="22" cy="28.5" r="1.6"/></g>',
+      thunder: CLOUD + '<path d="M17 24l-3.5 5h3l-1.5 3.5 5-5.5h-3l1.5-3z" fill="#ffc531"/>',
+    }[kind] || CLOUD;
+    return `<svg class="${cls}" viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
+  }
+
+  // ---------- the "place" the weather panel shows: the region, or the court you tapped ----------
+  // REGION has the same per-hour arrays as a court (t, s, g, …), built from the typical
+  // (median) court, so the hero, hourly strip and tiles don't care which one they're showing.
+  let REGION;
+  const median = (xs) => {
+    const v = xs.filter((x) => x != null && !Number.isNaN(x)).sort((a, b) => a - b);
+    if (!v.length) return null;
+    const m = Math.floor(v.length / 2);
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  };
+  const mode = (xs) => {
+    const n = new Map();
+    xs.forEach((x) => { if (x != null) n.set(x, (n.get(x) || 0) + 1); });
+    let best = null, bn = 0;
+    n.forEach((c, x) => { if (c > bn || (c === bn && x > best)) { best = x; bn = c; } });   // ties: the stormier code
+    return best;
+  };
+  function buildRegion() {
+    const cs = DATA.courts.filter((c) => c.type !== "school" && c.status !== "closed");
+    const H = DATA.times.length;
+    const at = (k, f, round = true) => Array.from({ length: H }, (_, h) => {
+      const v = f(cs.map((c) => (c[k] ? c[k][h] : null)));
+      return v == null ? null : round ? Math.round(v) : v;
+    });
+    REGION = {
+      id: null, name: "Inland Empire", city: "Claremont to Fontana", region: true, total: cs.length,
+      t: at("t", median), ft: at("ft", median), hu: at("hu", median), cc: at("cc", median),
+      uv: at("uv", median, false), w: at("w", median), g: at("g", median), p: at("p", median),
+      r: at("r", median, false), wc: at("wc", mode), s: at("s", median, false),
+      // Wind direction: the circular mean, so 350° and 10° average to 0°, not 180°.
+      d: Array.from({ length: H }, (_, h) => {
+        let x = 0, y = 0;
+        cs.forEach((c) => { const a = c.d[h] * Math.PI / 180; x += Math.cos(a); y += Math.sin(a); });
+        return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+      }),
+      good: Array.from({ length: H }, (_, h) => cs.filter((c) => c.b[h] === "play").length),
+      hi: (DATA.daily && DATA.daily.date || []).map((_, i) => { const v = median(cs.map((c) => (c.hi || [])[i])); return v == null ? null : Math.round(v); }),
+      lo: (DATA.daily && DATA.daily.date || []).map((_, i) => { const v = median(cs.map((c) => (c.lo || [])[i])); return v == null ? null : Math.round(v); }),
+      why: Array.from({ length: H }, () => []),
+    };
+    REGION.b = REGION.s.map((s) => bandOf(s));
+  }
+  const place = () => (state.selected && DATA.courts.find((c) => c.id === state.selected)) || REGION;
+  const val = (pl, k, h) => (pl[k] && pl[k][h] != null ? pl[k][h] : null);
+
+  // Sunrise / sunset for a local date ("2026-11-17"), from the forecast's daily data.
+  function sunTimes(date) {
+    const D = DATA.daily;
+    const i = D && D.date ? D.date.indexOf(date) : -1;
+    if (i < 0) return null;
+    return { rise: D.sunrise[i], set: D.sunset[i] };
+  }
+  const clock = (iso) => {   // "2026-11-17T16:45" -> "4:45 PM"
+    const [hh, mm] = iso.split("T")[1].split(":").map(Number);
+    return `${hh % 12 || 12}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}`;
+  };
+
+  // The hero's sky colour: what you'd see looking up at that hour.
+  function skyOf(pl, h) {
+    const cond = condition(val(pl, "wc", h), DATA.is_day[h], val(pl, "p", h), val(pl, "r", h));
+    const t = DATA.times[h], sun = sunTimes(t.slice(0, 10));
+    if (sun) {   // within an hour of sunrise or sunset: golden hour
+      const hr = Number(t.slice(11, 13));
+      const near = (iso) => Math.abs(Number(iso.slice(11, 13)) + Number(iso.slice(14, 16)) / 60 - (hr + 0.5)) <= 0.75;
+      if ((near(sun.rise) || near(sun.set)) && !["rain", "thunder", "drizzle"].includes(cond.kind)) return "golden";
+    }
+    const day = DATA.is_day[h];
+    if (["rain", "thunder", "drizzle", "snow"].includes(cond.kind)) return day ? "storm" : "storm-night";
+    if (["cloudy", "fog"].includes(cond.kind)) return day ? "overcast" : "overcast-night";
+    return day ? "clear" : "night";
+  }
+
+  // ---------- hero: big temperature, condition, highs/lows, and the tennis verdict ----------
+  function renderHero() {
+    const pl = place(), h = state.hour, now = h === state.base;
+    const cond = condition(val(pl, "wc", h), DATA.is_day[h], val(pl, "p", h), val(pl, "r", h));
+    const di = DATA.daily && DATA.daily.date ? DATA.daily.date.indexOf(DATA.times[h].slice(0, 10)) : -1;
+    const hi = di >= 0 ? val(pl, "hi", di) : null, lo = di >= 0 ? val(pl, "lo", di) : null;
+    const ft = val(pl, "ft", h);
+    const closed = !pl.region && pl.eff === "closed";
+    const b = closed ? "skip" : pl.b[h];
+    let verdict;
+    if (closed) verdict = `<b>🚫 Not playable</b><span>${esc(pl.effNote || "This court is closed")}</span>`;
+    else if (pl.region) {
+      const good = pl.good[h];
+      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${pl.total} courts` : BAND[b].label + " across the area"}</b>
+        <span>Typical score ${pl.s[h].toFixed(1)} / 10</span>`;
+    } else {
+      const why = pl.why[h].length ? pl.why[h].join(" · ") : "Nothing in the way";
+      verdict = `<b>${BAND[b].face} ${BAND[b].label} · ${pl.s[h].toFixed(1)}</b><span>${esc(why)}</span>`;
+    }
+    const when = now ? `<span class="live-dot"></span>Now · ${clockText()}` : `${fmtTime(DATA.times[h])} · in ${h - state.base} h`;
+    $("hero").className = `hero sky-${skyOf(pl, h)}`;
+    $("hero").innerHTML = `
+      <div class="hero-top">
+        ${pl.region ? '<div class="eyebrow">Tennis weather</div>' : '<button class="back" data-act="all">‹ All courts</button>'}
+        <h2>${esc(pl.name)}</h2>
+        <div class="hero-when">${pl.region ? "" : `${esc(pl.city)} · `}${when}${now ? "" : ' · <button class="link" data-act="now">Back to now</button>'}</div>
+      </div>
+      <div class="hero-main">
+        <div class="hero-temp">${val(pl, "t", h)}°</div>
+        <div class="hero-cond">${wxIcon(cond.kind, DATA.is_day[h], "wx big")}<span>${cond.label}</span></div>
+      </div>
+      <div class="hero-sub">${hi != null ? `H:${hi}° L:${lo}°` : ""}${ft != null ? `${hi != null ? " · " : ""}Feels like ${ft}°` : ""}</div>
+      <div class="hero-verdict ${b}">${verdict}</div>`;
+  }
+
+  // ---------- hourly strip: swipe through the hours like a weather app ----------
+  function renderHourly(scroll) {
+    const pl = place(), base = state.base, last = DATA.times.length - 1;
+    const items = [];
+    for (let i = base; i <= last; i++) {
+      const t = DATA.times[i], [d, hh] = [t.slice(0, 10), Number(t.slice(11, 13))];
+      const p = val(pl, "p", i), cond = condition(val(pl, "wc", i), DATA.is_day[i], p, val(pl, "r", i));
+      const closed = !pl.region && pl.eff === "closed";
+      const label = i === base ? "Now" : hh === 0 ? dayWord(d) : `${hh % 12 || 12}${hh < 12 ? "AM" : "PM"}`;
+      items.push(`<button class="hr${i === state.hour ? " sel" : ""}${hh === 0 && i !== base ? " newday" : ""}" data-h="${i}"
+          role="option" aria-selected="${i === state.hour}" aria-label="${fmtTime(t)}: ${val(pl, "t", i)} degrees, ${cond.label}, score ${pl.s[i].toFixed(1)}">
+        <span class="hr-t">${label}</span>
+        ${wxIcon(cond.kind, DATA.is_day[i])}
+        <span class="hr-p">${p != null && p >= 20 ? `${p}%` : ""}</span>
+        <span class="hr-temp">${val(pl, "t", i)}°</span>
+        <span class="hr-s ${closed ? "closed" : pl.b[i]}">${closed ? "—" : pl.s[i].toFixed(1)}</span>
+      </button>`);
+      // Sunrise / sunset slot, like phone weather apps.
+      const sun = sunTimes(d);
+      if (sun && i < last) for (const [iso, word] of [[sun.rise, "Sunrise"], [sun.set, "Sunset"]]) {
+        if (Number(iso.slice(11, 13)) === hh) {
+          items.push(`<div class="hr sunev" aria-label="${word} ${clock(iso)}"><span class="hr-t">${clock(iso).replace(" ", "")}</span>
+            <svg class="wx" viewBox="0 0 32 32" aria-hidden="true">${SUNG(16, 20, 5)}<path d="M4 25h24" stroke="var(--cloud)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16 ${word === "Sunrise" ? "9l-3 3m3-3l3 3" : "12l-3-3m3 3l3-3"}" stroke="#ff9f43" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            <span class="hr-p"></span><span class="hr-temp small">${word}</span><span class="hr-s none"></span></div>`);
+        }
+      }
+    }
+    const el = $("hourly");
+    const keep = el.scrollLeft;
+    el.innerHTML = items.join("");
+    el.scrollLeft = keep;
+    if (scroll) {
+      const sel = el.querySelector(".hr.sel");
+      if (sel) el.scrollTo({ left: sel.offsetLeft - el.clientWidth / 2 + sel.offsetWidth / 2, behavior: "smooth" });
+    }
+  }
+
+  // ---------- detail tiles ----------
+  const UV_LEVEL = (u) => (u < 3 ? "Low" : u < 6 ? "Moderate" : u < 8 ? "High" : u < 11 ? "Very high" : "Extreme");
+  function bestWindow(pl, h) {
+    let best = null;
+    for (let i = h; i < Math.min(h + 11, DATA.times.length - 1); i++) {
+      if (!DATA.is_day[i] || !DATA.is_day[i + 1]) continue;
+      const avg = (pl.s[i] + pl.s[i + 1]) / 2;
+      if (!best || avg > best.avg) best = { i, avg };
+    }
+    return best;
+  }
+  function renderTiles() {
+    const pl = place(), h = state.hour;
+    const closed = !pl.region && pl.eff === "closed";
+    const tile = (cls, icon, title, big, note, extra = "") =>
+      `<div class="tile ${cls}"><div class="tile-h">${icon}${title}</div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
+    const out = [];
+    // Best time to play (next 12 hours of daylight)
+    const bw = closed ? null : bestWindow(pl, h);
+    if (closed) out.push(tile("wide", "⭐ ", "Best time to play", "Not playable", esc(pl.effNote || "")));
+    else if (!bw) out.push(tile("wide", "⭐ ", "Best time to play", "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
+    else {
+      const end = DATA.times[bw.i + 2] || DATA.times[bw.i + 1];
+      out.push(tile(`wide best ${bandOf(bw.avg)}`, "⭐ ", "Best time to play",
+        `${fmtTime(DATA.times[bw.i])} – ${fmtTime(end).split(" ").slice(1).join(" ")}`, `Average score ${bw.avg.toFixed(1)} over those two hours`,
+        `<div class="mini">${Array.from({ length: Math.min(12, DATA.times.length - h) }, (_, k) => {
+          const i = h + k;
+          return `<i class="${pl.b[i]}${i === bw.i || i === bw.i + 1 ? " pick" : ""}${DATA.is_day[i] ? "" : " dark"}" title="${fmtTime(DATA.times[i])}: ${pl.s[i].toFixed(1)}"></i>`;
+        }).join("")}</div>`));
+    }
+    // Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
+    const w = val(pl, "w", h), g = val(pl, "g", h), dir = val(pl, "d", h) || 0;
+    const wb = pl.wb ? pl.wb[h] : g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
+    out.push(tile(`wind ${wb}`, ICON.wind, " Wind", `${w}<small> mph</small>`, `Gusts ${g} mph · from ${compass(dir)}`,
+      `<svg class="compass" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="2"/>
+        ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
+        <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
+    // Rain: this hour, and when the next rain is due.
+    const p = val(pl, "p", h), r = val(pl, "r", h);
+    let next = null;
+    for (let i = h; i < DATA.times.length; i++) if ((pl.r[i] || 0) >= 0.01 || (pl.p[i] || 0) >= 50) { next = i; break; }
+    out.push(tile("rain", ICON.rain, " Rain", `${p}<small>%</small>`,
+      r > 0 ? `${r.toFixed(2)}″ this hour` : next === h ? "Likely this hour" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : `No rain in the next ${DATA.times.length - h} hours`));
+    // Feels like
+    const ft = val(pl, "ft", h), t = val(pl, "t", h);
+    if (ft != null) {
+      const note = Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer";
+      out.push(tile("feels", ICON.temp, " Feels like", `${ft}°`, note));
+    }
+    // Humidity
+    const hu = val(pl, "hu", h);
+    if (hu != null) out.push(tile("humid", "💧 ", "Humidity", `${hu}<small>%</small>`,
+      hu < 25 ? "Very dry air. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play a bit slower." : "Comfortable"));
+    // UV
+    const uv = val(pl, "uv", h);
+    if (uv != null) out.push(tile("uv", "☀️ ", "UV index", `${Math.round(uv)}`, `${UV_LEVEL(uv)}${uv >= 3 ? " · Sunscreen and a hat" : ""}`,
+      `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
+    // Sunrise / sunset
+    const sun = sunTimes(DATA.times[h].slice(0, 10));
+    if (sun) out.push(tile("sun", "🌅 ", DATA.is_day[h] ? "Sunset" : "Sunrise", clock(DATA.is_day[h] ? sun.set : sun.rise),
+      DATA.is_day[h] ? `Sunrise was ${clock(sun.rise)}. After dark, lit courts only.` : `Sunset ${clock(sun.set)}`));
+    $("tiles").innerHTML = out.join("");
+  }
+
+  // ---------- court card (the court's own details: links, crowd, votes, comments) ----------
   function select(id) {
     state.selected = id;
     render();   // draws the card first so we know how much map it covers
+    // Desktop: bring the panel back to the top, where the court's weather now shows.
+    // (Phones keep their scroll position, so tapping a pin doesn't jump away from the map.)
+    if (innerWidth > 760) document.querySelector(".panel").scrollTo({ top: 0, behavior: "smooth" });
     const mk = markers.find((x) => x.ct.id === id);
     if (!mk) return;
     // Centre the court in the part of the map the card leaves visible:
@@ -953,7 +1207,7 @@
     const card = $("card"), wrap = map.getContainer();
     const fullWidth = card.offsetWidth > wrap.offsetWidth * 0.7;
     const padding = fullWidth
-      ? { top: 0, left: 0, right: 0, bottom: Math.min(card.offsetHeight + 12, wrap.offsetHeight * 0.7) }
+      ? { top: 0, left: 0, right: 0, bottom: Math.min(card.offsetHeight + 12, wrap.offsetHeight * 0.6) }
       : { top: 0, bottom: 0, right: 0, left: card.offsetWidth + 24 };
     map.easeTo({ center: [mk.ct.lon, mk.ct.lat], zoom: Math.max(map.getZoom(), 12.5), padding, duration: 600 });
   }
@@ -971,49 +1225,29 @@
     const ct = state.selected && DATA.courts.find((c) => c.id === state.selected);
     if (!ct) { card.hidden = true; return; }
     const h = state.hour, b = ct.b[h];
-    const why = ct.why[h].length ? ct.why[h].join(" · ") : "Nothing in the way";
-    const strip = [];
-    for (let i = h; i < Math.min(h + 12, DATA.times.length); i++) {
-      // Sun or moon above each hour; the block keeps its playability colour either way.
-      const day = DATA.is_day[i];
-      strip.push(`<div><span class="dn ${day ? "sun" : "moon"}" title="${day ? "Daylight" : "After dark"}">${day ? SUN : MOON}</span><i class="${ct.b[i]}" title="${fmtTime(DATA.times[i])}: ${ct.s[i]}"></i>${fmtTime(DATA.times[i], true)}</div>`);
-    }
     const st = STATUS[ct.eff];
     const banner = st ? `<div class="status ${st.cls}"><b>${st.badge} ${st.label}</b>${ct.effNote ? ` · ${esc(ct.effNote)}` : ""}</div>` : "";
-    // The card is rebuilt when the time or view changes; keep a half-written review.
+    // The card is rebuilt when the time or view changes; keep a half-written comment.
     const prev = card.dataset.court === ct.id && card.querySelector(".community");
     const typing = prev && prev.querySelector('form[data-act="comment"] input');
     const draft = typing && typing.value ? { text: typing.value, focused: document.activeElement === typing } : null;
+    const keepScroll = card.dataset.court === ct.id ? card.scrollTop : 0;
     card.dataset.court = ct.id;
     const fav = community.favorites.has(ct.id);
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
       ${sb ? `<button class="fav${fav ? " on" : ""}" data-act="fav" aria-pressed="${fav}" aria-label="${fav ? "Remove from" : "Add to"} your courts" title="${fav ? "In your courts" : "Add to your courts"}">${fav ? "★" : "☆"}</button>` : ""}
-      <div class="head">${courtSvg(ct.eff === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div></div>
+      <div class="head">${courtSvg(ct.eff === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div>
+        ${ct.eff === "closed" ? "" : `<span class="card-score ${b}" title="${BAND[b].label} at ${fmtTime(DATA.times[h])}">${ct.s[h].toFixed(1)}</span>`}</div>
       ${banner}
       <div class="links">
-        <a href="${mapsUrl(ct)}" target="_blank" rel="noopener">📍 Google Maps</a>
+        <a href="${mapsUrl(ct)}" target="_blank" rel="noopener">📍 Directions</a>
         <a href="${streetUrl(ct)}" target="_blank" rel="noopener">🚶 Street View</a>
       </div>
-      ${ct.eff === "closed"
-        // A closed court can't be "good to play" whatever the weather, so no score or best window.
-        ? `<div class="verdict skip"><span class="face" aria-hidden="true">🚫</span>
-            <div><strong>Not playable</strong><span class="muted small">Weather below is for reference only</span></div>
-            <span class="score">—</span></div>`
-        : `<div class="verdict ${b}"><span class="face" aria-hidden="true">${BAND[b].face}</span>
-            <div><strong>${BAND[b].label}</strong><span class="muted small">${fmtTime(DATA.times[h])} · ${why}</span></div>
-            <span class="score">${ct.s[h].toFixed(1)}<small>/10</small></span></div>`}
-      <div class="facts">
-        <span>${ICON.temp} ${ct.t[h]}°F</span>
-        <span>${ICON.wind} ${ct.w[h]} mph, gusts ${ct.g[h]} · from ${compass(ct.d[h])}</span>
-        <span>${ICON.rain} ${ct.p[h]}% chance${ct.r[h] > 0 ? ` · ${ct.r[h]}″` : ""}</span>
-      </div>
-      ${ct.eff === "closed" ? "" : `<div class="muted small">Next 12 hours</div>
-      <div class="strip">${strip.join("")}</div>
-      <div class="best">${bestWindow(ct, h)}</div>`}
       ${sb ? crowdHtml(ct) : ""}
       ${communityHtml(ct)}`;
     card.hidden = false;
+    card.scrollTop = keepScroll;
     card.querySelector(".x").addEventListener("click", closeCard);
     if (draft) {   // the card was rebuilt mid-comment: put the half-typed comment back
       const input = card.querySelector('form[data-act="comment"] input');
@@ -1022,40 +1256,21 @@
     loadCourt(ct.id);
   }
 
-  // Best 2-hour daylight window in the next 12 hours (average score).
-  function bestWindow(ct, h) {
-    let best = null;
-    for (let i = h; i < Math.min(h + 11, DATA.times.length - 1); i++) {
-      if (!DATA.is_day[i] || !DATA.is_day[i + 1]) continue;
-      const avg = (ct.s[i] + ct.s[i + 1]) / 2;
-      if (!best || avg > best.avg) best = { i, avg };
-    }
-    if (!best) return "🌙 No daylight in the next 12 hours";
-    const end = DATA.times[best.i + 2] || DATA.times[best.i + 1];
-    return `⭐ Best window: ${fmtTime(DATA.times[best.i])}–${fmtTime(end, true)} (${best.avg.toFixed(1)})`;
-  }
-
   // ---------- legend + list ----------
   function renderLegend() {
     const B = DATA.bands;
     const rgba = (c, a) => `rgb(${c.join(" ")} / ${a})`;
     const sw = (bg, text) => `<span><b class="sw" style="background:${bg}"></b>${text}</span>`;
-    const rain = rgba(RAIN_RGB, 0.5), wind = rgba(WIND_RGB, 0.5);
-    const both = rgba(BOTH_RGB, 0.5);
     const ramp = (c) => `linear-gradient(90deg, ${rgba(c, 0.12)}, ${rgba(c, 0.55)})`;
     let html;
     if (state.layer === "play") {
-      html = `<div class="title">Playability score</div>
-        <div class="keys"><span><i style="background:${PAL.play}"></i>Play</span><span><i style="background:${PAL.iffy}"></i>Iffy</span><span><i style="background:${PAL.skip}"></i>Skip it</span></div>
-        <div class="keys">${sw(rain, "Rain")}${sw(wind, "Wind")}${sw(both, "Both")}</div>`;
+      html = `<div class="keys"><span><i style="background:${PAL.play}"></i>Play</span><span><i style="background:${PAL.iffy}"></i>Iffy</span><span><i style="background:${PAL.skip}"></i>Skip</span></div>
+        <div class="keys">${sw(rgba(RAIN_RGB, 0.5), "Rain")}${sw(rgba(WIND_RGB, 0.5), "Wind")}${sw(rgba(BOTH_RGB, 0.5), "Both")}</div>`;
     } else if (state.layer === "wind") {
-      html = `<div class="title">Wind gusts</div>
-        <div class="keys"><span><i style="background:${PAL.play}"></i>0–${B.wind_iffy - 1}</span><span><i style="background:${PAL.iffy}"></i>${B.wind_iffy}–${B.wind_skip - 1}</span><span><i style="background:${PAL.skip}"></i>${B.wind_skip}+ mph</span></div>
-        <div class="bar" style="background:${ramp(WIND_RGB)}"></div>
-        <div class="ends"><span>${B.wind_iffy} mph</span><span>${B.wind_skip}+ mph</span></div>`;
+      html = `<div class="keys"><span><i style="background:${PAL.play}"></i>0–${B.wind_iffy - 1}</span><span><i style="background:${PAL.iffy}"></i>${B.wind_iffy}–${B.wind_skip - 1}</span><span><i style="background:${PAL.skip}"></i>${B.wind_skip}+ mph gusts</span></div>
+        <div class="bar" style="background:${ramp(WIND_RGB)}"></div>`;
     } else {
-      html = `<div class="title">Rain</div>
-        <div class="bar" style="background:${ramp(RAIN_RGB)}"></div>
+      html = `<div class="bar" style="background:${ramp(RAIN_RGB)}"></div>
         <div class="ends"><span>likely</span><span>sprinkle</span><span>heavy</span></div>`;
     }
     $("legend").innerHTML = html;
@@ -1063,12 +1278,14 @@
 
   function listItem(c, h) {
     const closed = c.eff === "closed", b = closed ? "closed" : c.b[h];
-    const why = c.why[h].length ? c.why[h].join(" · ") : `Gusts ${c.g[h]} mph · ${c.p[h]}% rain · ${c.t[h]}°F`;
+    const cond = condition(c.wc ? c.wc[h] : null, DATA.is_day[h], c.p[h], c.r[h]);
+    const why = c.why[h].length ? c.why[h].join(" · ") : `Gusts ${c.g[h]} mph · ${c.p[h]}% rain`;
     const live = liveReport(c.id);
     const crowd = live && live.key ? `<span class="crowdtag ${live.cls}">${live.short} · ${ago(live.at)}</span> ` : "";
     return `<li tabindex="0" data-id="${c.id}">${courtSvg(b)}
       <div><div class="name">${c.name}</div><div class="sub">${crowd}${c.city} · ${closed ? "Not playable" : `${c.eff === "poor" ? "⚠ Rough court · " : ""}${why}`}</div></div>
-      <span class="num" aria-label="${closed ? "Not playable" : `${BAND[b].label}, score`}">${closed ? "—" : c.s[h].toFixed(1)}</span></li>`;
+      <span class="li-wx">${wxIcon(cond.kind, DATA.is_day[h])}${c.t[h]}°</span>
+      <span class="num ${b}" aria-label="${closed ? "Not playable" : `${BAND[b].label}, score`}">${closed ? "—" : c.s[h].toFixed(1)}</span></li>`;
   }
 
   function renderList() {
@@ -1082,65 +1299,37 @@
     const items = DATA.courts
       .filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed")   // not-playable courts aren't "best"
       .sort(byScore);
-    $("listTitle").textContent = `Best courts · ${fmtTime(DATA.times[h])}`;
-    $("list").innerHTML = items.map((c) => listItem(c, h)).join("");
+    $("listTitle").textContent = `Best courts · ${state.hour === state.base ? "now" : fmtTime(DATA.times[h])}`;
+    // Top 8, with a button for the rest, so phones don't scroll past 50 courts.
+    const shown = state.listAll ? items : items.slice(0, 8);
+    $("list").innerHTML = shown.map((c) => listItem(c, h)).join("");
+    $("listMore").hidden = items.length <= 8;
+    $("listMore").textContent = state.listAll ? "Show fewer" : `Show all ${items.length} courts`;
   }
 
-  function render() {
+  function render(scrollHourly) {
     applyStatuses();
     renderWeather();
     renderMarkers();
     renderCard();
     renderLegend();
     renderList();
-    renderTime();
+    renderHero();
+    renderHourly(scrollHourly);
+    renderTiles();
   }
 
-  // ---------- time bar ----------
-  function renderTime() {
-    const h = state.hour, ahead = h - state.base;
-    const dark = DATA.is_day[h] ? "" : "After dark · lit courts only";
-    if (ahead === 0) {
-      $("timeLabel").innerHTML = `<span class="live">Now</span> · ${clockText()}`;
-      $("dayLabel").textContent = dark || "Today";
-    } else {
-      $("timeLabel").textContent = fmtTime(DATA.times[h]);
-      $("dayLabel").textContent = `in ${ahead} hour${ahead === 1 ? "" : "s"}` + (dark ? ` · ${dark.toLowerCase()}` : "");
-    }
-    $("now").setAttribute("aria-pressed", String(ahead === 0));
-  }
-
-  // Slider runs from the real current hour to the end of the forecast. The bar is
-  // shaded day/night and labelled every 6 hours, with the weekday at midnight.
-  function buildTimeline() {
-    const slider = $("hour"), base = state.base, last = DATA.times.length - 1;
-    slider.min = base;
-    slider.max = last;
-    const span = Math.max(1, last - base);
-    const pos = (i) => (Math.min(last, Math.max(base, i)) - base) / span;
-    const stops = [];
-    for (let i = base; i <= last; i++) {
-      const c = DATA.is_day[i] ? "var(--day)" : "var(--night)";
-      stops.push(`${c} ${(pos(i - 0.5) * 100).toFixed(2)}% ${(pos(i + 0.5) * 100).toFixed(2)}%`);
-    }
-    $("track").style.background = `linear-gradient(90deg, ${stops.join(", ")})`;
-    const ticks = [];
-    for (let i = base + 1; i <= last; i++) {
-      const [d, t] = DATA.times[i].split("T");
-      const hr = Number(t.slice(0, 2));
-      if (hr % 6) continue;
-      const label = hr === 0 ? dayWord(d) : hr === 12 ? "12p" : hr < 12 ? `${hr}a` : `${hr - 12}p`;
-      // Match the native thumb's travel: it moves between thumb/2 and width - thumb/2.
-      ticks.push(`<span class="${hr === 0 ? "day" : ""}" style="left: calc(var(--thumb) / 2 + ${pos(i).toFixed(4)} * (100% - var(--thumb)))">${label}</span>`);
-    }
-    $("ticks").innerHTML = ticks.join("");
+  function setHour(h, fromStrip) {
+    state.hour = Math.max(state.base, Math.min(DATA.times.length - 1, h));
+    render(!fromStrip);
+    saveHash();
   }
 
   function showUpdated() {
     const gen = new Date(DATA.generated_utc.replace("Z", ":00Z"));
     const ageH = (Date.now() - gen) / 3.6e6;
     const when = gen.toLocaleString("en-US", { timeZone: PT, weekday: "short", hour: "numeric", minute: "2-digit" });
-    $("updated").textContent = ageH > 4 ? `⚠ Forecast is ${Math.floor(ageH)} hours old (updated ${when} PT)` : `Updated ${when} PT`;
+    $("updated").textContent = ageH > 4 ? `⚠ Forecast is ${Math.floor(ageH)} hours old (updated ${when} PT)` : `Forecast updated ${when} PT`;
   }
 
   // Every 30 s: keep the clock live and move "now" forward when the hour turns over.
@@ -1150,12 +1339,10 @@
       const followingNow = state.hour === state.base;
       state.base = nb;
       if (followingNow || state.hour < nb) state.hour = nb;
-      buildTimeline();
-      $("hour").value = state.hour;
       render();
       saveHash();
-    } else {
-      renderTime();
+    } else if (state.hour === state.base) {
+      renderHero();   // the "Now · 7:41 AM" clock
     }
     showUpdated();
   }
@@ -1169,11 +1356,10 @@
       DATA = d;
       markers.forEach((mk) => { const c = d.courts.find((x) => x.id === mk.ct.id); if (c) mk.ct = c; });
       buildWeather();
+      buildRegion();
       state.base = nowIndex();
       const i = DATA.times.indexOf(keep);
       state.hour = Math.max(state.base, i >= 0 ? i : state.base);
-      buildTimeline();
-      $("hour").value = state.hour;
       showUpdated();
       render();
     } catch (_) { /* offline or mid-deploy: try again next time */ }
@@ -1192,7 +1378,6 @@
     const t = q.get("t");
     const i = t ? DATA.times.findIndex((x) => x.startsWith(t)) : -1;
     state.hour = i >= state.base ? i : state.base;   // a link to a time that already passed falls back to now
-    $("hour").value = state.hour;
     const court = q.get("court");
     if (court && DATA.courts.some((c) => c.id === court)) state.selected = court;
   }
@@ -1205,21 +1390,50 @@
     history.replaceState(null, "", q.toString() ? `#${q}` : location.pathname);
   }
 
+  // ---------- default view + "show all courts" button ----------
+  // The whole forecast region (Claremont to Fontana, Chino Hills to the foothills), with a margin.
+  const HOME_BOUNDS = [[-117.80, 33.965], [-117.38, 34.215]];
+  const homePadding = () => (innerWidth < 760 ? 12 : 30);
+  function goHome() {
+    map.fitBounds(HOME_BOUNDS, { padding: homePadding(), duration: 700 });
+  }
+  class HomeControl {
+    onAdd() {
+      this.el = document.createElement("div");
+      this.el.className = "maplibregl-ctrl maplibregl-ctrl-group";
+      this.el.innerHTML = `<button type="button" class="home-btn" title="Show all courts" aria-label="Zoom out to show all courts">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M17 8V3h-5M3 12v5h5M17 12v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+      this.el.querySelector("button").addEventListener("click", (e) => { e.stopPropagation(); goHome(); });
+      return this.el;
+    }
+    onRemove() { this.el.remove(); }
+  }
+
   // ---------- wiring ----------
   function wire() {
     document.querySelectorAll(".seg button").forEach((btn) => btn.addEventListener("click", () => {
       setLayer(btn.dataset.layer); render(); saveHash();
     }));
     $("schools").addEventListener("change", (e) => { state.schools = e.target.checked; render(); saveHash(); });
-    const slider = $("hour");
-    const setHour = (h) => {
-      state.hour = Math.max(state.base, Math.min(DATA.times.length - 1, h));
-      slider.value = state.hour; render(); saveHash();
-    };
-    slider.addEventListener("input", () => setHour(Number(slider.value)));
-    $("prev").addEventListener("click", () => setHour(state.hour - 1));
-    $("next").addEventListener("click", () => setHour(state.hour + 1));
-    $("now").addEventListener("click", () => setHour(state.base));
+    // Hourly strip: tap an hour; arrow keys step through hours.
+    $("hourly").addEventListener("click", (e) => {
+      const b = e.target.closest(".hr[data-h]");
+      if (b) setHour(Number(b.dataset.h), true);
+    });
+    $("hourly").addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      setHour(state.hour + (e.key === "ArrowRight" ? 1 : -1));
+      const sel = $("hourly").querySelector(".hr.sel");
+      if (sel) sel.focus();
+    });
+    // Hero buttons: back to all courts / back to now.
+    $("hero").addEventListener("click", (e) => {
+      const t = e.target.closest("[data-act]");
+      if (!t) return;
+      if (t.dataset.act === "all") closeCard();
+      else if (t.dataset.act === "now") setHour(state.base);
+    });
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
     document.addEventListener("visibilitychange", () => {
@@ -1237,6 +1451,7 @@
       $("locateBtn").hidden = false;
       $("locateBtn").addEventListener("click", () => locate(true));
     }
+    $("listMore").addEventListener("click", () => { state.listAll = !state.listAll; renderList(); });
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     for (const id of ["list", "favList"]) {
       $(id).addEventListener("click", pick);
@@ -1254,19 +1469,18 @@
       play: css("--play"), iffy: css("--iffy"), skip: css("--skip"), closed: css("--muted"),
       iffyRGB: hex(css("--iffy")), skipRGB: hex(css("--skip")),
     };
-    const pts = DATA.courts.filter((c) => c.type !== "school");
-    const lons = pts.map((c) => c.lon), lats = pts.map((c) => c.lat);
+    buildRegion();
     map = new maplibregl.Map({
       container: "map",
       style: STYLE_URL,
-      bounds: [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-      // Tighter margins on phones so the map opens more zoomed in and courts spread out.
-      fitBoundsOptions: { padding: innerWidth < 760 ? { top: 60, bottom: 16, left: 14, right: 14 } : { top: 70, bottom: 40, left: 40, right: 40 } },
+      bounds: HOME_BOUNDS,
+      fitBoundsOptions: { padding: homePadding() },
       attributionControl: { compact: true, customAttribution: 'Forecast: <a href="https://open-meteo.com/">Open-Meteo</a>' },
       dragRotate: false,
       pitchWithRotate: false,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new HomeControl(), "top-right");
     map.touchZoomRotate.disableRotation();
     map.on("error", (e) => console.warn("map:", e.error && e.error.message));
     map.on("idle", () => { document.body.dataset.mapReady = "1"; });  // lets tests know rendering finished
@@ -1285,10 +1499,9 @@
       buildWeather();
       buildMarkers();
       state.base = state.hour = nowIndex();
-      buildTimeline();
       wire();
       readHash();
-      render();
+      render(true);
       if (state.selected) select(state.selected);
       initCommunity();   // reviews load after the map, so they never slow down the forecast
     });
