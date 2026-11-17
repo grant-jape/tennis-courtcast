@@ -984,9 +984,9 @@
     return `<svg class="${cls}" viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
   }
 
-  // ---------- the "place" the weather panel shows: the region, or the court you tapped ----------
+  // ---------- where the weather panel is: you, a court you tapped, or the whole region ----------
   // REGION has the same per-hour arrays as a court (t, s, g, …), built from the typical
-  // (median) court, so the hero, hourly strip and tiles don't care which one they're showing.
+  // (median) court, so it can stand in for "the Inland Empire" before we know where you are.
   let REGION;
   const median = (xs) => {
     const v = xs.filter((x) => x != null && !Number.isNaN(x)).sort((a, b) => a - b);
@@ -1008,11 +1008,14 @@
       const v = f(cs.map((c) => (c[k] ? c[k][h] : null)));
       return v == null ? null : round ? Math.round(v) : v;
     });
+    const day = (k) => (DATA.daily && DATA.daily.date || []).map((_, i) => {
+      const v = median(cs.map((c) => (c[k] || [])[i]));
+      return v == null ? null : Math.round(v);
+    });
     REGION = {
-      id: null, name: "Inland Empire", city: "Claremont to Fontana", region: true, total: cs.length,
-      t: at("t", median), ft: at("ft", median), hu: at("hu", median), cc: at("cc", median),
+      total: cs.length, t: at("t", median), ft: at("ft", median), hu: at("hu", median), cc: at("cc", median),
       uv: at("uv", median, false), w: at("w", median), g: at("g", median), p: at("p", median),
-      r: at("r", median, false), wc: at("wc", mode), s: at("s", median, false),
+      r: at("r", median, false), wc: at("wc", mode), s: at("s", median, false), hi: day("hi"), lo: day("lo"),
       // Wind direction: the circular mean, so 350° and 10° average to 0°, not 180°.
       d: Array.from({ length: H }, (_, h) => {
         let x = 0, y = 0;
@@ -1020,35 +1023,166 @@
         return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
       }),
       good: Array.from({ length: H }, (_, h) => cs.filter((c) => c.b[h] === "play").length),
-      hi: (DATA.daily && DATA.daily.date || []).map((_, i) => { const v = median(cs.map((c) => (c.hi || [])[i])); return v == null ? null : Math.round(v); }),
-      lo: (DATA.daily && DATA.daily.date || []).map((_, i) => { const v = median(cs.map((c) => (c.lo || [])[i])); return v == null ? null : Math.round(v); }),
-      why: Array.from({ length: H }, () => []),
     };
     REGION.b = REGION.s.map((s) => bandOf(s));
   }
-  const place = () => (state.selected && DATA.courts.find((c) => c.id === state.selected)) || REGION;
-  const val = (pl, k, h) => (pl[k] && pl[k][h] != null ? pl[k][h] : null);
 
-  // Sunrise / sunset for a local date ("2026-11-17"), from the forecast's daily data.
-  function sunTimes(date) {
+  // You: set once you tap "Use my location" (and remembered for next time).
+  // `pos` is rounded to ~1 km before it's sent anywhere; `exact` only draws your dot on the map.
+  const ME = { pos: null, exact: null, name: "", busy: false, marker: null };
+  const REGION_CENTER = { lat: 34.09, lon: -117.6 };
+  function nearestCourts(lat, lon, n = 3) {
+    return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
+      .map((c) => ({ c, m: meters(lat, lon, c.lat, c.lon) })).sort((a, b) => a.m - b.m).slice(0, n);
+  }
+  // The place on screen: its name, where it is, the court scores that speak for it (`src`),
+  // and fallback weather numbers (`fb`) from the 2-hourly build until live detail arrives.
+  function place() {
+    const ct = state.selected && DATA.courts.find((c) => c.id === state.selected);
+    if (ct) return { kind: "court", name: ct.name, sub: ct.city, lat: ct.lat, lon: ct.lon, src: ct, fb: ct, court: ct };
+    if (ME.pos) {
+      const near = nearestCourts(ME.pos.lat, ME.pos.lon);
+      const best = DATA.times.map((_, h) => near.reduce((a, x) => (!a || x.c.s[h] > a.c.s[h] ? x : a), null));
+      return {
+        kind: "me", name: ME.name || "Your location", sub: "Your location", lat: ME.pos.lat, lon: ME.pos.lon,
+        src: { s: best.map((x, h) => x.c.s[h]), b: best.map((x, h) => x.c.b[h]), best }, fb: near[0].c, near,
+      };
+    }
+    return { kind: "region", name: "Inland Empire", sub: "Claremont to Fontana", ...REGION_CENTER, src: REGION, fb: REGION };
+  }
+
+  async function useMyLocation(asked) {
+    if (!navigator.geolocation || ME.busy) return;
+    ME.busy = true;
+    if (asked) renderHero();
+    let pos;
+    try {
+      pos = await new Promise((ok, fail) => navigator.geolocation.getCurrentPosition(ok, fail,
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 }));
+    } catch (e) {
+      ME.busy = false;
+      if (asked) toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your local weather."
+        : "Couldn't get your location. Try again in a moment.");
+      renderHero();
+      return;
+    }
+    ME.busy = false;
+    const { latitude, longitude } = pos.coords;
+    // ~1 km is plenty for weather, and not enough to pinpoint a home.
+    ME.pos = { lat: Math.round(latitude * 100) / 100, lon: Math.round(longitude * 100) / 100 };
+    ME.exact = { lat: latitude, lon: longitude };
+    store.set("cc-useloc", "on");
+    const guess = nearestCourts(latitude, longitude, 1)[0];
+    ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
+    showMeOnMap();
+    if (asked) map.easeTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 11.5), duration: 700 });
+    renderPanel();
+    try {
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${ME.pos.lat}&longitude=${ME.pos.lon}&localityLanguage=en`)).json();
+      const name = j.locality || j.city;
+      if (name) { ME.name = name; renderHero(); }
+    } catch (_) { /* keep the guess */ }
+  }
+  async function autoUseLocation() {   // you allowed it before: use it again, without asking
+    if (store.get("cc-useloc") !== "on" || !navigator.permissions || !navigator.geolocation) return;
+    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(false); } catch (_) { /* fine */ }
+  }
+  function showMeOnMap() {
+    if (!ME.exact) return;
+    if (!ME.marker) {
+      const el = document.createElement("div");
+      el.className = "me-dot";
+      el.title = "You";
+      el.style.zIndex = "3000000";   // above every court pin (their z-index tracks how notable they are)
+      ME.marker = new maplibregl.Marker({ element: el }).setLngLat([ME.exact.lon, ME.exact.lat]).addTo(map);
+    } else ME.marker.setLngLat([ME.exact.lon, ME.exact.lat]);
+  }
+
+  // ---------- live detail from Open-Meteo for the place on screen ----------
+  // 10-day forecast, feels like, dew point, visibility, pressure, UV and air quality, fetched by the
+  // browser for whatever place is showing (rounded to ~1 km) and kept for 30 minutes.
+  const WX = new Map();
+  const wxKey = (lat, lon) => `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  function wxFor(pl) {
+    const k = wxKey(pl.lat, pl.lon), hit = WX.get(k);
+    const stale = !hit || Date.now() - hit.at > (hit.data ? 30 : 2) * 60 * 1000;
+    if (stale && !(hit && hit.loading)) loadWx(k, pl.lat, pl.lon);
+    return (hit && hit.data) || null;
+  }
+  async function loadWx(k, lat, lon) {
+    const prev = WX.get(k);
+    WX.set(k, { data: prev && prev.data, at: prev ? prev.at : 0, loading: true });
+    const common = { latitude: lat.toFixed(2), longitude: lon.toFixed(2), timezone: PT };
+    const fq = new URLSearchParams({
+      ...common, models: "gfs_seamless", forecast_days: "10",
+      temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
+      hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,"
+        + "weather_code,cloud_cover,visibility,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index,pressure_msl,is_day",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max,sunrise,sunset,daylight_duration",
+    });
+    const aq = new URLSearchParams({ ...common, forecast_days: "3", hourly: "us_aqi,pm2_5,ozone" });
+    let data = prev && prev.data;
+    try {
+      const [f, a] = await Promise.all([
+        fetch(`https://api.open-meteo.com/v1/forecast?${fq}`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${aq}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
+      if (f && f.hourly) data = { f, aq: a && a.hourly ? a : null, ix: new Map(f.hourly.time.map((t, i) => [t, i])),
+        aix: a && a.hourly ? new Map(a.hourly.time.map((t, i) => [t, i])) : new Map() };
+    } catch (_) { /* offline: keep showing the build's numbers */ }
+    WX.set(k, { data, at: Date.now(), loading: false });
+    const pl = place();
+    if (wxKey(pl.lat, pl.lon) === k) renderPanel();
+  }
+  // A reading for forecast hour h: live detail when we have it, else the 2-hourly build's number.
+  const API = { t: "temperature_2m", ft: "apparent_temperature", hu: "relative_humidity_2m", dp: "dew_point_2m",
+    p: "precipitation_probability", r: "precipitation", wc: "weather_code", cc: "cloud_cover", vis: "visibility",
+    w: "wind_speed_10m", g: "wind_gusts_10m", d: "wind_direction_10m", uv: "uv_index", pr: "pressure_msl" };
+  function reader(pl) {
+    const wx = wxFor(pl);
+    const byTime = (k, time) => {
+      if (k === "aqi" || k === "pm25" || k === "o3") {
+        const i = wx && wx.aq ? wx.aix.get(time) : undefined;
+        return i == null ? null : wx.aq.hourly[{ aqi: "us_aqi", pm25: "pm2_5", o3: "ozone" }[k]][i];
+      }
+      const i = wx ? wx.ix.get(time) : undefined;
+      return i == null || !API[k] ? null : wx.f.hourly[API[k]][i];
+    };
+    return {
+      wx,
+      time: byTime,
+      at(k, h) {
+        const live = byTime(k, DATA.times[h]);
+        if (live != null) return live;
+        const a = pl.fb[k];
+        return a && a[h] != null ? a[h] : null;
+      },
+    };
+  }
+  const round = (v) => (v == null ? null : Math.round(v));
+
+  // Sunrise / sunset for a local date ("2026-11-17"): live daily data, else the build's.
+  function sunTimes(date, rd) {
+    const W = rd && rd.wx && rd.wx.f.daily;
+    let i = W ? W.time.indexOf(date) : -1;
+    if (i >= 0) return { rise: W.sunrise[i], set: W.sunset[i], len: W.daylight_duration ? W.daylight_duration[i] : null };
     const D = DATA.daily;
-    const i = D && D.date ? D.date.indexOf(date) : -1;
-    if (i < 0) return null;
-    return { rise: D.sunrise[i], set: D.sunset[i] };
+    i = D && D.date ? D.date.indexOf(date) : -1;
+    return i < 0 ? null : { rise: D.sunrise[i], set: D.sunset[i], len: null };
   }
   const clock = (iso) => {   // "2026-11-17T16:45" -> "4:45 PM"
     const [hh, mm] = iso.split("T")[1].split(":").map(Number);
     return `${hh % 12 || 12}:${String(mm).padStart(2, "0")} ${hh < 12 ? "AM" : "PM"}`;
   };
+  const hoursOf = (iso) => Number(iso.slice(11, 13)) + Number(iso.slice(14, 16)) / 60;
 
   // The hero's sky colour: what you'd see looking up at that hour.
-  function skyOf(pl, h) {
-    const cond = condition(val(pl, "wc", h), DATA.is_day[h], val(pl, "p", h), val(pl, "r", h));
-    const t = DATA.times[h], sun = sunTimes(t.slice(0, 10));
-    if (sun) {   // within an hour of sunrise or sunset: golden hour
-      const hr = Number(t.slice(11, 13));
-      const near = (iso) => Math.abs(Number(iso.slice(11, 13)) + Number(iso.slice(14, 16)) / 60 - (hr + 0.5)) <= 0.75;
-      if ((near(sun.rise) || near(sun.set)) && !["rain", "thunder", "drizzle"].includes(cond.kind)) return "golden";
+  function skyOf(rd, h) {
+    const cond = condition(rd.at("wc", h), DATA.is_day[h], rd.at("p", h), rd.at("r", h));
+    const t = DATA.times[h], sun = sunTimes(t.slice(0, 10), rd);
+    if (sun && !["rain", "thunder", "drizzle"].includes(cond.kind)) {   // within ~45 min of sunrise or sunset
+      const mid = Number(t.slice(11, 13)) + 0.5;
+      if (Math.abs(hoursOf(sun.rise) - mid) <= 0.75 || Math.abs(hoursOf(sun.set) - mid) <= 0.75) return "golden";
     }
     const day = DATA.is_day[h];
     if (["rain", "thunder", "drizzle", "snow"].includes(cond.kind)) return day ? "storm" : "storm-night";
@@ -1056,35 +1190,51 @@
     return day ? "clear" : "night";
   }
 
-  // ---------- hero: big temperature, condition, highs/lows, and the tennis verdict ----------
+  // ---------- hero: place, big temperature, condition, highs/lows, and the tennis verdict ----------
   function renderHero() {
-    const pl = place(), h = state.hour, now = h === state.base;
-    const cond = condition(val(pl, "wc", h), DATA.is_day[h], val(pl, "p", h), val(pl, "r", h));
-    const di = DATA.daily && DATA.daily.date ? DATA.daily.date.indexOf(DATA.times[h].slice(0, 10)) : -1;
-    const hi = di >= 0 ? val(pl, "hi", di) : null, lo = di >= 0 ? val(pl, "lo", di) : null;
-    const ft = val(pl, "ft", h);
-    const closed = !pl.region && pl.eff === "closed";
-    const b = closed ? "skip" : pl.b[h];
+    const pl = place(), rd = reader(pl), h = state.hour, now = h === state.base;
+    const cond = condition(rd.at("wc", h), DATA.is_day[h], rd.at("p", h), rd.at("r", h));
+    const date = DATA.times[h].slice(0, 10);
+    let hi = null, lo = null;
+    const W = rd.wx && rd.wx.f.daily, wi = W ? W.time.indexOf(date) : -1;
+    if (wi >= 0) { hi = round(W.temperature_2m_max[wi]); lo = round(W.temperature_2m_min[wi]); }
+    else {
+      const di = DATA.daily && DATA.daily.date ? DATA.daily.date.indexOf(date) : -1;
+      if (di >= 0 && pl.fb.hi) { hi = pl.fb.hi[di]; lo = pl.fb.lo[di]; }
+    }
+    const ft = round(rd.at("ft", h));
+    const closed = pl.kind === "court" && pl.court.eff === "closed";
+    const b = closed ? "skip" : pl.src.b[h], s = pl.src.s[h];
     let verdict;
-    if (closed) verdict = `<b>🚫 Not playable</b><span>${esc(pl.effNote || "This court is closed")}</span>`;
-    else if (pl.region) {
-      const good = pl.good[h];
-      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${pl.total} courts` : BAND[b].label + " across the area"}</b>
-        <span>Typical score ${pl.s[h].toFixed(1)} / 10</span>`;
+    if (closed) verdict = `<b>🚫 Not playable</b><span>${esc(pl.court.effNote || "This court is closed")}</span>`;
+    else if (pl.kind === "court") {
+      const why = pl.court.why[h].length ? pl.court.why[h].join(" · ") : "Nothing in the way";
+      verdict = `<b>${BAND[b].face} ${BAND[b].label} · ${s.toFixed(1)}</b><span>${esc(why)}</span>`;
+    } else if (pl.kind === "me") {
+      const x = pl.src.best[h];
+      verdict = `<b>${BAND[b].face} ${BAND[b].label} nearby · ${s.toFixed(1)}</b>
+        <span>Best near you: <button class="link inline" data-court="${x.c.id}">${esc(x.c.name)}</button> · ${(x.m / 1609).toFixed(1)} mi</span>`;
     } else {
-      const why = pl.why[h].length ? pl.why[h].join(" · ") : "Nothing in the way";
-      verdict = `<b>${BAND[b].face} ${BAND[b].label} · ${pl.s[h].toFixed(1)}</b><span>${esc(why)}</span>`;
+      const good = REGION.good[h];
+      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${REGION.total} courts` : `${BAND[b].label} across the area`}</b>
+        <span>Typical score ${s.toFixed(1)} / 10</span>`;
     }
     const when = now ? `<span class="live-dot"></span>Now · ${clockText()}` : `${fmtTime(DATA.times[h])} · in ${h - state.base} h`;
-    $("hero").className = `hero sky-${skyOf(pl, h)}`;
+    const canLocate = !!navigator.geolocation;
+    let top;
+    if (pl.kind === "court") top = `<button class="back" data-act="all">‹ ${ME.pos ? esc(ME.name) : "All courts"}</button>`;
+    else if (pl.kind === "me") top = '<div class="eyebrow">📍 Your location</div>';
+    else top = `<div class="eyebrow">Tennis weather</div>`;
+    $("hero").className = `hero sky-${skyOf(rd, h)}`;
     $("hero").innerHTML = `
       <div class="hero-top">
-        ${pl.region ? '<div class="eyebrow">Tennis weather</div>' : '<button class="back" data-act="all">‹ All courts</button>'}
+        ${top}
         <h2>${esc(pl.name)}</h2>
-        <div class="hero-when">${pl.region ? "" : `${esc(pl.city)} · `}${when}${now ? "" : ' · <button class="link" data-act="now">Back to now</button>'}</div>
+        <div class="hero-when">${pl.kind === "court" ? `${esc(pl.sub)} · ` : ""}${when}${now ? "" : ' · <button class="link" data-act="now">Back to now</button>'}</div>
+        ${pl.kind === "region" && canLocate ? `<button class="locbtn" data-act="useloc"${ME.busy ? " disabled" : ""}>${ME.busy ? "Finding you…" : "📍 Use my location"}</button>` : ""}
       </div>
       <div class="hero-main">
-        <div class="hero-temp">${val(pl, "t", h)}°</div>
+        <div class="hero-temp">${round(rd.at("t", h))}°</div>
         <div class="hero-cond">${wxIcon(cond.kind, DATA.is_day[h], "wx big")}<span>${cond.label}</span></div>
       </div>
       <div class="hero-sub">${hi != null ? `H:${hi}° L:${lo}°` : ""}${ft != null ? `${hi != null ? " · " : ""}Feels like ${ft}°` : ""}</div>
@@ -1093,23 +1243,23 @@
 
   // ---------- hourly strip: swipe through the hours like a weather app ----------
   function renderHourly(scroll) {
-    const pl = place(), base = state.base, last = DATA.times.length - 1;
+    const pl = place(), rd = reader(pl), base = state.base, last = DATA.times.length - 1;
+    const closed = pl.kind === "court" && pl.court.eff === "closed";
     const items = [];
     for (let i = base; i <= last; i++) {
-      const t = DATA.times[i], [d, hh] = [t.slice(0, 10), Number(t.slice(11, 13))];
-      const p = val(pl, "p", i), cond = condition(val(pl, "wc", i), DATA.is_day[i], p, val(pl, "r", i));
-      const closed = !pl.region && pl.eff === "closed";
+      const t = DATA.times[i], d = t.slice(0, 10), hh = Number(t.slice(11, 13));
+      const p = round(rd.at("p", i)), temp = round(rd.at("t", i));
+      const cond = condition(rd.at("wc", i), DATA.is_day[i], p, rd.at("r", i));
       const label = i === base ? "Now" : hh === 0 ? dayWord(d) : `${hh % 12 || 12}${hh < 12 ? "AM" : "PM"}`;
       items.push(`<button class="hr${i === state.hour ? " sel" : ""}${hh === 0 && i !== base ? " newday" : ""}" data-h="${i}"
-          role="option" aria-selected="${i === state.hour}" aria-label="${fmtTime(t)}: ${val(pl, "t", i)} degrees, ${cond.label}, score ${pl.s[i].toFixed(1)}">
+          role="option" aria-selected="${i === state.hour}" aria-label="${fmtTime(t)}: ${temp} degrees, ${cond.label}, score ${pl.src.s[i].toFixed(1)}">
         <span class="hr-t">${label}</span>
         ${wxIcon(cond.kind, DATA.is_day[i])}
         <span class="hr-p">${p != null && p >= 20 ? `${p}%` : ""}</span>
-        <span class="hr-temp">${val(pl, "t", i)}°</span>
-        <span class="hr-s ${closed ? "closed" : pl.b[i]}">${closed ? "—" : pl.s[i].toFixed(1)}</span>
+        <span class="hr-temp">${temp}°</span>
+        <span class="hr-s ${closed ? "closed" : pl.src.b[i]}">${closed ? "—" : pl.src.s[i].toFixed(1)}</span>
       </button>`);
-      // Sunrise / sunset slot, like phone weather apps.
-      const sun = sunTimes(d);
+      const sun = sunTimes(d, rd);   // sunrise / sunset slot, like phone weather apps
       if (sun && i < last) for (const [iso, word] of [[sun.rise, "Sunrise"], [sun.set, "Sunset"]]) {
         if (Number(iso.slice(11, 13)) === hh) {
           items.push(`<div class="hr sunev" aria-label="${word} ${clock(iso)}"><span class="hr-t">${clock(iso).replace(" ", "")}</span>
@@ -1129,69 +1279,167 @@
     }
   }
 
-  // ---------- detail tiles ----------
+  // ---------- detail tiles (Pixel Weather style) ----------
   const UV_LEVEL = (u) => (u < 3 ? "Low" : u < 6 ? "Moderate" : u < 8 ? "High" : u < 11 ? "Very high" : "Extreme");
-  function bestWindow(pl, h) {
+  // US EPA air-quality bands, and what they mean for a couple of hours of tennis.
+  const AQI_BANDS = [
+    [50, "Good", "#2fb344", "Great air for playing"],
+    [100, "Moderate", "#e6c229", "Fine for most players"],
+    [150, "Unhealthy for sensitive groups", "#f08a24", "Asthma or allergies? Take more breaks"],
+    [200, "Unhealthy", "#e5484d", "Consider shorter, easier sessions"],
+    [300, "Very unhealthy", "#a3262a", "Better to skip today"],
+    [Infinity, "Hazardous", "#6e1b1b", "Stay indoors"],
+  ];
+  const aqiBand = (v) => AQI_BANDS.find(([max]) => v <= max);
+  function bestWindow(src, h) {
     let best = null;
     for (let i = h; i < Math.min(h + 11, DATA.times.length - 1); i++) {
       if (!DATA.is_day[i] || !DATA.is_day[i + 1]) continue;
-      const avg = (pl.s[i] + pl.s[i + 1]) / 2;
+      const avg = (src.s[i] + src.s[i + 1]) / 2;
       if (!best || avg > best.avg) best = { i, avg };
     }
     return best;
   }
+  const tile = (cls, icon, title, big, note, extra = "") =>
+    `<div class="tile ${cls}"><div class="tile-h">${icon}<span>${title}</span></div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
+  const TI = {   // tile header icons (simple line icons; colour comes from CSS)
+    star: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 4 4.3.5-3.2 3 .9 4.3L8 11.3 4.1 13.4l.9-4.3-3.2-3 4.3-.5z" fill="currentColor"/></svg>',
+    cal: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    leaf: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13c0-6 4-10 11-10 0 7-4 11-10 11M3 13l5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    sun: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    drop: ICON.rain, wind: ICON.wind, temp: ICON.temp,
+    eye: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>',
+    gauge: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.3 12a6.5 6.5 0 1 1 11.4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 9l3-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    rise: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12a5 5 0 0 1 10 0M1 14h14M8 2v4M6 4l2-2 2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  };
+
   function renderTiles() {
-    const pl = place(), h = state.hour;
-    const closed = !pl.region && pl.eff === "closed";
-    const tile = (cls, icon, title, big, note, extra = "") =>
-      `<div class="tile ${cls}"><div class="tile-h">${icon}${title}</div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
+    const pl = place(), rd = reader(pl), h = state.hour, wx = rd.wx;
+    const closed = pl.kind === "court" && pl.court.eff === "closed";
     const out = [];
-    // Best time to play (next 12 hours of daylight)
-    const bw = closed ? null : bestWindow(pl, h);
-    if (closed) out.push(tile("wide", "⭐ ", "Best time to play", "Not playable", esc(pl.effNote || "")));
-    else if (!bw) out.push(tile("wide", "⭐ ", "Best time to play", "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
+
+    // 1. Best time to play (next 12 hours of daylight)
+    const bw = closed ? null : bestWindow(pl.src, h);
+    const title = pl.kind === "me" ? "Best time to play near you" : "Best time to play";
+    if (closed) out.push(tile("wide", TI.star, title, "Not playable", esc(pl.court.effNote || "")));
+    else if (!bw) out.push(tile("wide", TI.star, title, "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
     else {
       const end = DATA.times[bw.i + 2] || DATA.times[bw.i + 1];
-      out.push(tile(`wide best ${bandOf(bw.avg)}`, "⭐ ", "Best time to play",
-        `${fmtTime(DATA.times[bw.i])} – ${fmtTime(end).split(" ").slice(1).join(" ")}`, `Average score ${bw.avg.toFixed(1)} over those two hours`,
+      const who = pl.kind === "me" ? ` at ${esc(pl.src.best[bw.i].c.name)}` : "";
+      out.push(tile(`wide best ${bandOf(bw.avg)}`, TI.star, title,
+        `${fmtTime(DATA.times[bw.i])} – ${fmtTime(end).split(" ").slice(1).join(" ")}`, `Score ${bw.avg.toFixed(1)}${who}`,
         `<div class="mini">${Array.from({ length: Math.min(12, DATA.times.length - h) }, (_, k) => {
           const i = h + k;
-          return `<i class="${pl.b[i]}${i === bw.i || i === bw.i + 1 ? " pick" : ""}${DATA.is_day[i] ? "" : " dark"}" title="${fmtTime(DATA.times[i])}: ${pl.s[i].toFixed(1)}"></i>`;
-        }).join("")}</div>`));
+          return `<i class="${pl.src.b[i]}${i === bw.i || i === bw.i + 1 ? " pick" : ""}${DATA.is_day[i] ? "" : " dark"}" title="${fmtTime(DATA.times[i])}: ${pl.src.s[i].toFixed(1)}"></i>`;
+        }).join("")}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>+12h</span></div>`));
     }
-    // Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
-    const w = val(pl, "w", h), g = val(pl, "g", h), dir = val(pl, "d", h) || 0;
-    const wb = pl.wb ? pl.wb[h] : g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
-    out.push(tile(`wind ${wb}`, ICON.wind, " Wind", `${w}<small> mph</small>`, `Gusts ${g} mph · from ${compass(dir)}`,
+
+    // 2. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
+    if (wx && wx.f.daily) {
+      const D = wx.f.daily, lo = Math.min(...D.temperature_2m_min), hi = Math.max(...D.temperature_2m_max), span = Math.max(1, hi - lo);
+      const today = pacificHourStamp().slice(0, 10);
+      const rows = D.time.map((d, i) => {
+        const c = condition(D.weather_code[i], 1, D.precipitation_probability_max[i], (D.precipitation_sum[i] || 0) / 6);
+        const a = ((D.temperature_2m_min[i] - lo) / span) * 100, b = ((D.temperature_2m_max[i] - lo) / span) * 100;
+        const pp = D.precipitation_probability_max[i];
+        return `<li${d === today ? ' class="today"' : ""}><span class="dd">${d === today ? "Today" : dayWord(d)}</span>
+          ${wxIcon(c.kind, true)}<span class="dp">${pp >= 20 ? `${pp}%` : ""}</span>
+          <span class="dlo">${round(D.temperature_2m_min[i])}°</span>
+          <span class="drange"><i style="left:${a.toFixed(1)}%;right:${(100 - b).toFixed(1)}%"></i></span>
+          <span class="dhi">${round(D.temperature_2m_max[i])}°</span></li>`;
+      }).join("");
+      out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><ul class="ten">${rows}</ul></div>`);
+    } else out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><div class="tile-note">Loading…</div></div>`);
+
+    // 3. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
+    const n = Math.min(24, DATA.times.length - h);
+    let total = 0, next = null;
+    const bars = Array.from({ length: n }, (_, k) => {
+      const i = h + k, p = rd.at("p", i) || 0, r = rd.at("r", i) || 0;
+      total += r;
+      if (next == null && (r >= 0.01 || p >= 50)) next = i;
+      return `<i style="height:${Math.max(4, p)}%" class="${r >= 0.01 ? "wet" : ""}" title="${fmtTime(DATA.times[i])}: ${round(p)}%"></i>`;
+    }).join("");
+    out.push(tile("wide precip", TI.drop, "Precipitation",
+      `${total >= 0.005 ? total.toFixed(2) : "0"}<small>″ next ${n} h</small>`,
+      next === h ? "Rain likely now" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : "No rain expected",
+      `<div class="pbars">${bars}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>Chance of rain each hour</span><span>+${n}h</span></div>`));
+
+    // 4. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
+    const w = round(rd.at("w", h)), g = round(rd.at("g", h)), dir = rd.at("d", h) || 0;
+    const wb = g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
+    out.push(tile(`wind ${wb}`, TI.wind, "Wind", `${w}<small> mph</small>`, `Gusts ${g} mph<br>From ${compass(dir)}`,
       `<svg class="compass" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="2"/>
         ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
         <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
-    // Rain: this hour, and when the next rain is due.
-    const p = val(pl, "p", h), r = val(pl, "r", h);
-    let next = null;
-    for (let i = h; i < DATA.times.length; i++) if ((pl.r[i] || 0) >= 0.01 || (pl.p[i] || 0) >= 50) { next = i; break; }
-    out.push(tile("rain", ICON.rain, " Rain", `${p}<small>%</small>`,
-      r > 0 ? `${r.toFixed(2)}″ this hour` : next === h ? "Likely this hour" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : `No rain in the next ${DATA.times.length - h} hours`));
-    // Feels like
-    const ft = val(pl, "ft", h), t = val(pl, "t", h);
-    if (ft != null) {
-      const note = Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer";
-      out.push(tile("feels", ICON.temp, " Feels like", `${ft}°`, note));
+
+    // 5. Air quality (US AQI)
+    const aqi = rd.at("aqi", h);
+    if (aqi != null) {
+      const [, label, color, note] = aqiBand(aqi), pm = rd.at("pm25", h);
+      out.push(tile("aqi", TI.leaf, "Air quality", `${round(aqi)}`, `<b style="color:${color}">${label}</b><br>${note}${pm != null ? ` · PM2.5 ${round(pm)}` : ""}`,
+        `<div class="aqbar"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
+    } else out.push(tile("aqi", TI.leaf, "Air quality", "—", wx ? "Not available here" : "Loading…"));
+
+    // 6. UV
+    const uv = rd.at("uv", h);
+    if (uv != null) {
+      const di = wx && wx.f.daily ? wx.f.daily.time.indexOf(DATA.times[h].slice(0, 10)) : -1;
+      const peak = di >= 0 ? wx.f.daily.uv_index_max[di] : null;
+      out.push(tile("uv", TI.sun, "UV index", `${Math.round(uv)}`, `${UV_LEVEL(uv)}${uv >= 3 ? " · Sunscreen and a hat" : ""}${peak != null ? `<br>Today's peak ${Math.round(peak)}` : ""}`,
+        `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
     }
-    // Humidity
-    const hu = val(pl, "hu", h);
-    if (hu != null) out.push(tile("humid", "💧 ", "Humidity", `${hu}<small>%</small>`,
-      hu < 25 ? "Very dry air. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play a bit slower." : "Comfortable"));
-    // UV
-    const uv = val(pl, "uv", h);
-    if (uv != null) out.push(tile("uv", "☀️ ", "UV index", `${Math.round(uv)}`, `${UV_LEVEL(uv)}${uv >= 3 ? " · Sunscreen and a hat" : ""}`,
-      `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
-    // Sunrise / sunset
-    const sun = sunTimes(DATA.times[h].slice(0, 10));
-    if (sun) out.push(tile("sun", "🌅 ", DATA.is_day[h] ? "Sunset" : "Sunrise", clock(DATA.is_day[h] ? sun.set : sun.rise),
-      DATA.is_day[h] ? `Sunrise was ${clock(sun.rise)}. After dark, lit courts only.` : `Sunset ${clock(sun.set)}`));
+
+    // 7. Humidity + dew point
+    const hu = round(rd.at("hu", h)), dp = round(rd.at("dp", h)), t = round(rd.at("t", h));
+    if (hu != null) out.push(tile("humid", TI.drop, "Humidity", `${hu}<small>%</small>`,
+      `${dp != null ? `Dew point ${dp}°<br>` : ""}${hu < 25 ? "Very dry. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play slower." : "Comfortable"}`));
+
+    // 8. Feels like
+    const ft = round(rd.at("ft", h));
+    if (ft != null) out.push(tile("feels", TI.temp, "Feels like", `${ft}°`,
+      Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer"));
+
+    // 9. Visibility
+    const vis = rd.at("vis", h);
+    if (vis != null) {
+      const mi = vis / 1609;
+      out.push(tile("vis", TI.eye, "Visibility", mi >= 10 ? "10+<small> mi</small>" : `${mi.toFixed(mi < 3 ? 1 : 0)}<small> mi</small>`,
+        mi >= 10 ? "Perfectly clear" : mi >= 5 ? "Light haze" : mi >= 1 ? "Hazy" : "Fog. Hard to track the ball."));
+    }
+
+    // 10. Pressure, and which way it's heading (falling pressure often means weather is on the way).
+    const pr = rd.at("pr", h);
+    if (pr != null) {
+      const earlier = rd.time("pr", DATA.times[h].slice(0, 11) + String(Math.max(0, Number(DATA.times[h].slice(11, 13)) - 3)).padStart(2, "0") + ":00");
+      const dlt = earlier != null ? pr - earlier : 0;
+      out.push(tile("press", TI.gauge, "Pressure", `${(pr * 0.02953).toFixed(2)}<small> inHg</small>`,
+        Math.abs(dlt) < 0.7 ? "Steady" : dlt > 0 ? "↑ Rising: settled weather" : "↓ Falling: weather may change"));
+    }
+
+    // 11. Sunrise & sunset, with the sun's place along today's arc.
+    const sun = sunTimes(DATA.times[h].slice(0, 10), rd);
+    if (sun) {
+      const r0 = hoursOf(sun.rise), s0 = hoursOf(sun.set), now = Number(DATA.times[h].slice(11, 13)) + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
+      const f = Math.max(0, Math.min(1, (now - r0) / (s0 - r0)));
+      const x = 10 + f * 180, y = 70 - Math.sin(f * Math.PI) * 55;
+      const len = sun.len ? `${Math.floor(sun.len / 3600)} h ${Math.round((sun.len % 3600) / 60)} m of daylight` : "";
+      out.push(`<div class="tile wide sunt"><div class="tile-h">${TI.rise}<span>Sunrise &amp; sunset</span></div>
+        <svg class="arc" viewBox="0 0 200 80" aria-hidden="true">
+          <path d="M10 70 Q100 -40 190 70" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4"/>
+          <path d="M0 70h200" stroke="var(--line)" stroke-width="1.5"/>
+          ${DATA.is_day[h] ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#ffc531"/>` : ""}
+        </svg>
+        <div class="sunrow"><div><span class="tile-note">Sunrise</span><b>${clock(sun.rise)}</b></div>
+          <div class="mid tile-note">${len}</div>
+          <div><span class="tile-note">Sunset</span><b>${clock(sun.set)}</b></div></div>
+        <div class="tile-note">After sunset, lit courts only.</div></div>`);
+    }
+
     $("tiles").innerHTML = out.join("");
   }
+
+  function renderPanel(scroll) { renderHero(); renderHourly(scroll); renderTiles(); }
 
   // ---------- court card (the court's own details: links, crowd, votes, comments) ----------
   function select(id) {
@@ -1276,6 +1524,7 @@
     $("legend").innerHTML = html;
   }
 
+  // Your ★ courts (the only list now; the map is how you find courts).
   function listItem(c, h) {
     const closed = c.eff === "closed", b = closed ? "closed" : c.b[h];
     const cond = condition(c.wc ? c.wc[h] : null, DATA.is_day[h], c.p[h], c.r[h]);
@@ -1287,24 +1536,11 @@
       <span class="li-wx">${wxIcon(cond.kind, DATA.is_day[h])}${c.t[h]}°</span>
       <span class="num ${b}" aria-label="${closed ? "Not playable" : `${BAND[b].label}, score`}">${closed ? "—" : c.s[h].toFixed(1)}</span></li>`;
   }
-
   function renderList() {
     const h = state.hour;
-    const byScore = (a, b) => (a.eff === "poor") - (b.eff === "poor") ||   // rough courts sink
-      b.s[h] - a.s[h] || a.g[h] - b.g[h] || a.name.localeCompare(b.name);
-    // Your favorites first (whatever their state), then the best courts overall.
-    const favs = DATA.courts.filter((c) => community.favorites.has(c.id)).sort(byScore);
+    const favs = DATA.courts.filter((c) => community.favorites.has(c.id)).sort((a, b) => b.s[h] - a.s[h] || a.name.localeCompare(b.name));
     $("favWrap").hidden = !favs.length;
     $("favList").innerHTML = favs.map((c) => listItem(c, h)).join("");
-    const items = DATA.courts
-      .filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed")   // not-playable courts aren't "best"
-      .sort(byScore);
-    $("listTitle").textContent = `Best courts · ${state.hour === state.base ? "now" : fmtTime(DATA.times[h])}`;
-    // Top 8, with a button for the rest, so phones don't scroll past 50 courts.
-    const shown = state.listAll ? items : items.slice(0, 8);
-    $("list").innerHTML = shown.map((c) => listItem(c, h)).join("");
-    $("listMore").hidden = items.length <= 8;
-    $("listMore").textContent = state.listAll ? "Show fewer" : `Show all ${items.length} courts`;
   }
 
   function render(scrollHourly) {
@@ -1314,9 +1550,7 @@
     renderCard();
     renderLegend();
     renderList();
-    renderHero();
-    renderHourly(scrollHourly);
-    renderTiles();
+    renderPanel(scrollHourly);
   }
 
   function setHour(h, fromStrip) {
@@ -1429,10 +1663,12 @@
     });
     // Hero buttons: back to all courts / back to now.
     $("hero").addEventListener("click", (e) => {
-      const t = e.target.closest("[data-act]");
+      const t = e.target.closest("[data-act], [data-court]");
       if (!t) return;
-      if (t.dataset.act === "all") closeCard();
+      if (t.dataset.court) { select(t.dataset.court); saveHash(); }
+      else if (t.dataset.act === "all") closeCard();
       else if (t.dataset.act === "now") setHour(state.base);
+      else if (t.dataset.act === "useloc") useMyLocation(true);
     });
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
@@ -1451,12 +1687,9 @@
       $("locateBtn").hidden = false;
       $("locateBtn").addEventListener("click", () => locate(true));
     }
-    $("listMore").addEventListener("click", () => { state.listAll = !state.listAll; renderList(); });
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
-    for (const id of ["list", "favList"]) {
-      $(id).addEventListener("click", pick);
-      $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
-    }
+    $("favList").addEventListener("click", pick);
+    $("favList").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
     map.on("click", () => { if (state.selected) closeCard(); });
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
@@ -1504,6 +1737,7 @@
       render(true);
       if (state.selected) select(state.selected);
       initCommunity();   // reviews load after the map, so they never slow down the forecast
+      autoUseLocation(); // you allowed location before: show your local weather again
     });
   }
 
