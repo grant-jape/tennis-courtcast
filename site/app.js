@@ -1187,60 +1187,79 @@
     return { kind: "region", name: "Southern California", sub: "The coast to the Inland Empire", ...REGION_CENTER, src: REGION, fb: REGION };
   }
 
-  async function useMyLocation(asked) {
-    if (!navigator.geolocation || ME.busy) return;
-    ME.busy = true;
-    if (asked) renderHero();
-    let pos;
-    try {
-      pos = await new Promise((ok, fail) => navigator.geolocation.getCurrentPosition(ok, fail,
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 }));
-    } catch (e) {
+  // The ◎ "locate me" button: MapLibre's built-in, like Google Maps. A blue dot with an accuracy
+  // circle; tap to fly to you and follow you as you move; pan away and it stops following (tap to
+  // recentre). Every position it reports also updates the weather panel.
+  let geo = null, lastNamed = null;
+  const LOCATE_ZOOM = 12.5;   // close enough that the courts around you show as pins
+  function addGeolocate() {
+    if (!navigator.geolocation) return;
+    geo = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true, timeout: 15000, maximumAge: 60 * 1000 },
+      trackUserLocation: true, showAccuracyCircle: true, showUserLocation: true,
+      fitBoundsOptions: { maxZoom: LOCATE_ZOOM, duration: 900 },
+    });
+    map.addControl(geo, "top-right");
+    geo.on("geolocate", (e) => setMe(e.coords));
+    geo.on("error", (e) => {
       ME.busy = false;
       const sw = $("setUseloc");
       if (sw) sw.checked = false;
-      if (asked) toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your local weather."
+      toast(e.code === 1 ? "Location is blocked for this site. Allow it in your browser settings to see your area."
         : "Couldn't get your location. Try again in a moment.");
       renderHero();
+    });
+  }
+  function useMyLocation() {
+    if (!geo) return;
+    if (ME.exact) {   // already found you: just recentre
+      map.flyTo({ center: [ME.exact.lon, ME.exact.lat], zoom: Math.max(map.getZoom(), LOCATE_ZOOM), duration: 900 });
       return;
     }
+    ME.busy = true;
+    renderHero();
+    geo.trigger();
+  }
+  async function setMe(coords) {
     ME.busy = false;
-    const { latitude, longitude } = pos.coords;
+    const { latitude, longitude } = coords;
+    ME.exact = { lat: latitude, lon: longitude };   // only for the map; never sent anywhere
     // ~1 km is plenty for weather, and not enough to pinpoint a home.
-    ME.pos = { lat: Math.round(latitude * 100) / 100, lon: Math.round(longitude * 100) / 100 };
-    ME.exact = { lat: latitude, lon: longitude };
+    const pos = { lat: Math.round(latitude * 100) / 100, lon: Math.round(longitude * 100) / 100 };
+    const moved = !ME.pos || ME.pos.lat !== pos.lat || ME.pos.lon !== pos.lon;
+    ME.pos = pos;
     store.set("cc-useloc", "on");
-    const guess = nearestCourts(latitude, longitude, 1)[0];
-    ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
-    showMeOnMap();
-    if (asked) map.easeTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 11.5), duration: 700 });
+    const sw = $("setUseloc");
+    if (sw) sw.checked = true;
+    if (!moved) return;   // following you: only redo the panel when you've moved ~1 km
+    const renamed = !lastNamed || meters(lastNamed.lat, lastNamed.lon, pos.lat, pos.lon) > 1500;
+    if (renamed) {
+      const guess = nearestCourts(latitude, longitude, 1)[0];
+      ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
+      lastNamed = pos;
+    }
     renderPanel();
+    if (!renamed) return;
     try {
-      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${ME.pos.lat}&longitude=${ME.pos.lon}&localityLanguage=en`)).json();
+      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lon}&localityLanguage=en`)).json();
       const name = j.locality || j.city;
       if (name) { ME.name = name; renderHero(); }
     } catch (_) { /* keep the guess */ }
   }
   function stopUsingLocation() {
     store.set("cc-useloc", "off");
+    // Switch the ◎ button off too (it goes OFF from "following", and via "following" from "background").
+    try { for (let i = 0; i < 2 && geo && geo._watchState && geo._watchState !== "OFF"; i++) geo.trigger(); } catch (_) { /* fine */ }
     ME.pos = ME.exact = null;
     ME.name = "";
-    if (ME.marker) { ME.marker.remove(); ME.marker = null; }
+    lastNamed = null;
     renderPanel();
   }
-  async function autoUseLocation() {   // you allowed it before: use it again, without asking
-    if (store.get("cc-useloc") !== "on" || !navigator.permissions || !navigator.geolocation) return;
-    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(false); } catch (_) { /* fine */ }
-  }
-  function showMeOnMap() {
-    if (!ME.exact) return;
-    if (!ME.marker) {
-      const el = document.createElement("div");
-      el.className = "me-dot";
-      el.title = "You";
-      el.style.zIndex = "3000000";   // above every court pin (their z-index tracks how notable they are)
-      ME.marker = new maplibregl.Marker({ element: el }).setLngLat([ME.exact.lon, ME.exact.lat]).addTo(map);
-    } else ME.marker.setLngLat([ME.exact.lon, ME.exact.lat]);
+  // Opening the site: if you've allowed location before (and haven't turned it off in Settings),
+  // fly straight to your area. First-time visitors aren't asked until they tap ◎ or "Use my location".
+  async function autoUseLocation() {
+    if (store.get("cc-useloc") === "off" || !navigator.permissions || !geo) return;
+    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(); } catch (_) { /* fine */ }
   }
 
   // ---------- live detail from Open-Meteo for the place on screen ----------
@@ -1813,7 +1832,7 @@
     $("settings").addEventListener("click", (e) => {
       if (e.target === $("settings") || e.target.closest('[data-act="close"]')) $("settings").close();
     });
-    $("setUseloc").addEventListener("change", (e) => { if (e.target.checked) useMyLocation(true); else stopUsingLocation(); });
+    $("setUseloc").addEventListener("change", (e) => { if (e.target.checked) useMyLocation(); else stopUsingLocation(); });
     $("setAutocheck").addEventListener("change", (e) => {
       store.set("cc-autocheck", e.target.checked ? "on" : "off");
       if (e.target.checked) autoLocate(true);
@@ -1837,7 +1856,7 @@
       if (t.dataset.court) { select(t.dataset.court); saveHash(); }
       else if (t.dataset.act === "all") closeCard();
       else if (t.dataset.act === "now") setHour(state.base);
-      else if (t.dataset.act === "useloc") useMyLocation(true);
+      else if (t.dataset.act === "useloc") useMyLocation();
     });
     setInterval(tick, 30 * 1000);
     setInterval(refreshData, 15 * 60 * 1000);
@@ -1895,6 +1914,7 @@
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new HomeControl(), "top-right");
+    addGeolocate();
     map.touchZoomRotate.disableRotation();
     map.on("error", (e) => console.warn("map:", e.error && e.error.message));
     map.on("idle", () => { document.body.dataset.mapReady = "1"; });  // lets tests know rendering finished
