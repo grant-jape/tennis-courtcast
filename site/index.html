@@ -27,6 +27,7 @@
         <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
       </div>
       <label class="toggle"><input type="checkbox" id="schools"><span class="track" aria-hidden="true"></span> Schools</label>
+      <button id="acctBtn" class="acct-btn" hidden>Sign in</button>
     </div>
   </header>
 
@@ -34,10 +35,16 @@
     <section class="mapwrap">
       <div id="map" aria-label="Map of tennis courts and conditions"></div>
       <div class="legend" id="legend"></div>
+      <button id="locateBtn" class="locate" hidden><span aria-hidden="true">📍</span> At a court?</button>
+      <div id="toast" class="toast" role="status" hidden></div>
       <article id="card" class="card" hidden aria-live="polite"></article>
     </section>
 
     <aside class="panel">
+      <section id="favWrap" hidden>
+        <h2>★ Your courts</h2>
+        <ol id="favList" class="list"></ol>
+      </section>
       <h2 id="listTitle">Best courts</h2>
       <ol id="list" class="list"></ol>
     </aside>
@@ -59,6 +66,12 @@
       <div id="ticks" class="ticks" aria-hidden="true"></div>
     </div>
   </footer>
+
+  <!-- Sign in / create account / profile. Screens are drawn by app.js into #acctBody. -->
+  <dialog id="acct" class="acct" aria-label="Your account">
+    <button class="x" data-act="close" aria-label="Close">×</button>
+    <div id="acctBody"></div>
+  </dialog>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>

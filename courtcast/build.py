@@ -128,6 +128,8 @@ def main(argv=None):
         # status: "" (fine) / "poor" (playable but rough) / "closed" (not playable); note explains why.
         data["courts"].append({**{k: c.get(k) or "" for k in ("id", "name", "city", "type", "status", "note")},
                                "lat": c["lat"], "lon": c["lon"],
+                               # optional "courts" column: how many courts the site has (feeds the "likely busy" guess)
+                               "courts": int(c["courts"]) if (c.get("courts") or "").strip().isdigit() else None,
                                **series(res, start, hours)})
     for (la, lo), res in zip(grid, grid_res):
         ser = series(res, start, hours)

@@ -30,28 +30,33 @@
     <a class="back" href="./">← Back to the map</a>
     <div class="card">
       <h1>Privacy policy</h1>
-      <div class="muted">Tennis CourtCast · last updated November 16, 2026</div>
+      <div class="muted">Tennis CourtCast · last updated November 17, 2026</div>
 
-      <p>Tennis CourtCast is a free, non-commercial map of tennis court weather in the Inland Empire. You can use the map without an account. This page explains what happens if you sign in with Google to vote on a court's condition or leave a comment.</p>
+      <p>Tennis CourtCast is a free, non-commercial map of tennis court weather in the Inland Empire. You can use the map without an account. This page explains what happens if you create an account (with Google or with an email and password) to save favorite courts, vote on a court's condition, comment, or report how many courts are open.</p>
 
       <h2>What we collect</h2>
       <ul>
-        <li><strong>When you sign in with Google:</strong> your name and email address from your Google account, so we know which votes and comments are yours. Sign-in is handled by Supabase, the service that stores them.</li>
+        <li><strong>When you create an account:</strong> your name and email address. With Google, they come from your Google account; with email, from the sign-up form. If you use a password, it's stored only as a scrambled hash by Supabase, the service that runs sign-in; we can't see it.</li>
+        <li><strong>Your profile:</strong> the display name you choose (you can change it any time) and your favorite courts.</li>
         <li><strong>When you vote:</strong> the court and your vote (Great, Okay, Poor or Not playable).</li>
         <li><strong>When you comment:</strong> the court, your comment, and when you posted it.</li>
+        <li><strong>When you check in at a court:</strong> which court you're at, how many courts you said were open, and when.</li>
       </ul>
-      <p>We don't use tracking cookies, ads or analytics, and the map never asks for your location.</p>
+
+      <h2>Your location</h2>
+      <p>The map only uses your location if you tap <strong>At a court?</strong> and allow it, or if you allowed it before and leave <em>"ask how many courts are open"</em> switched on in your profile. Your phone works out which court you're at <strong>on the phone itself</strong>; your coordinates are never sent to us or stored. We only receive "this court, now", and only when you're signed in. Your most recent check-in is deleted automatically after 3 hours; the open-court reports you send are kept so the map can learn when courts are usually busy.</p>
+      <p>We don't use tracking cookies, ads or analytics.</p>
 
       <h2>What other people see</h2>
-      <p>Comments are public and show your <strong>first name only</strong>, the comment and how long ago you posted it. Votes are shown only as totals per court; nobody can see how you voted. Your email address and last name are never shown.</p>
+      <p>Comments are public and show your <strong>first name only</strong>, the comment and how long ago you posted it. Votes are shown only as totals per court; nobody can see how you voted. Open-court reports are shown without any name ("All courts taken · reported 12 min ago"). The map can show how many players are at a court right now, but only when it's 2 or more, so nobody is singled out. Your email address, last name, favorites and check-ins are never shown to anyone.</p>
 
       <h2>How it's used and shared</h2>
-      <p>Your information is used only to show votes and comments on the map and to let you change or delete your own. We don't sell it or share it with anyone. It's stored with <a href="https://supabase.com/privacy">Supabase</a>, and sign-in goes through <a href="https://policies.google.com/privacy">Google</a>; their privacy policies cover their part.</p>
+      <p>Your information is used only to run these features and to let you change or delete your own. We don't sell it or share it with anyone. It's stored with <a href="https://supabase.com/privacy">Supabase</a>, and Google sign-in goes through <a href="https://policies.google.com/privacy">Google</a>; their privacy policies cover their part.</p>
 
       <h2>Deleting your information</h2>
       <ul>
-        <li>Delete any of your comments yourself: open the court on the map and tap <strong>Delete</strong> under your comment. Tap your highlighted vote again to remove it.</li>
-        <li>To delete your account and everything you've posted, open an issue on the project's <a href="https://github.com/grant-jape/tennis-courtcast/issues">GitHub page</a> asking for account deletion (don't post your email there). We'll remove your account, votes and comments.</li>
+        <li>Delete any of your comments yourself: open the court on the map and tap <strong>Delete</strong> under your comment. Tap your highlighted vote again to remove it. Tap ★ on a court to remove it from your favorites.</li>
+        <li>To delete your account and everything tied to it (profile, votes, comments, favorites and court reports), open your profile and tap <strong>Delete account</strong>. It happens right away and can't be undone.</li>
       </ul>
 
       <h2>Weather and map data</h2>
