@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Tennis CourtCast logo: a tennis-ball cloud with the sun peeking out behind it. -->
+  <defs>
+    <radialGradient id="felt" cx="35%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#f4ff8f"/><stop offset=".55" stop-color="#d4e83a"/><stop offset="1" stop-color="#a8c214"/>
+    </radialGradient>
+    <radialGradient id="sun" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ffab1f"/>
+    </radialGradient>
+    <path id="cloud" d="M19 52h28a11 11 0 0 0 1.2-21.94A15 15 0 0 0 19.6 33.2 9.5 9.5 0 0 0 19 52z"/>
+    <clipPath id="cloudClip"><use href="#cloud"/></clipPath>
+  </defs>
+  <g transform="translate(-3 5)">
+    <g transform="translate(41 22)">
+      <g stroke="#ffb320" stroke-width="3.2" stroke-linecap="round">
+        <path d="M0-15v-5"/><path d="M0 15v5"/><path d="M-15 0h-5"/><path d="M15 0h5"/>
+        <path d="M-10.6-10.6l-3.5-3.5"/><path d="M10.6-10.6l3.5-3.5"/><path d="M-10.6 10.6l-3.5 3.5"/><path d="M10.6 10.6l3.5 3.5"/>
+      </g>
+      <circle r="11" fill="url(#sun)"/>
+    </g>
+    <use href="#cloud" fill="url(#felt)"/>
+    <g clip-path="url(#cloudClip)" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+      <path d="M9 26c10 6 13 18 6 30"/><path d="M60 24c-12 5-15 19-8 31"/>
+    </g>
+    <use href="#cloud" fill="none" stroke="#8fa70d" stroke-width="1.2" opacity=".55"/>
+  </g>
+</svg>
