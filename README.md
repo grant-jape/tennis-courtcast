@@ -14,6 +14,9 @@ Rain at Day Creek doesn't mean rain at Claremont. Fontana can be gusting 25 mph 
 - **Time slider:** scrub through the next 36 hours. The URL updates, so you can share a link like `…/#t=2026-11-16T14` ("what about Monday 2pm?").
 - **Court popups:** current conditions, a 12-hour strip, and the best two-hour daylight window.
 - **School courts** are behind a toggle because public access varies.
+- **Accounts:** sign in with Google or an email and password. Your profile holds your display name, your favorite courts (★, pinned to the top of the list) and your activity.
+- **Courts right now:** players at a court tap *All taken / 1 open / 2+ open / All open*. Reports count fully for 30 minutes and fade out by 90. With no recent report, the card shows a guess ("Likely busy") from the time of week, the weather score and the court count. Location is only used to work out which court you're at; it never leaves the phone. Add an optional `courts` column (number of courts) to `courts.csv` to sharpen the guess.
+- The database schema (row-level security, check-in functions) is in [`supabase/migrations/`](supabase/migrations/).
 
 ## How the score works
 
