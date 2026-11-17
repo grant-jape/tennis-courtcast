@@ -1456,15 +1456,7 @@
     [Infinity, "Hazardous", "#6e1b1b", "Stay indoors"],
   ];
   const aqiBand = (v) => AQI_BANDS.find(([max]) => v <= max);
-  function bestWindow(src, h) {
-    let best = null;
-    for (let i = h; i < Math.min(h + 11, DATA.times.length - 1); i++) {
-      if (!DATA.is_day[i] || !DATA.is_day[i + 1]) continue;
-      const avg = (src.s[i] + src.s[i + 1]) / 2;
-      if (!best || avg > best.avg) best = { i, avg };
-    }
-    return best;
-  }
+
   const tile = (cls, icon, title, big, note, extra = "") =>
     `<div class="tile ${cls}"><div class="tile-h">${icon}<span>${title}</span></div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
   const TI = {   // tile header icons (simple line icons; colour comes from CSS)
@@ -1480,26 +1472,9 @@
 
   function renderTiles() {
     const pl = place(), rd = reader(pl), h = state.hour, wx = rd.wx;
-    const closed = pl.kind === "court" && pl.court.eff === "closed";
     const out = [];
 
-    // 1. Best time to play (next 12 hours of daylight)
-    const bw = closed ? null : bestWindow(pl.src, h);
-    const title = pl.kind === "me" ? "Best time to play near you" : pl.kind === "view" ? "Best time to play here" : "Best time to play";
-    if (closed) out.push(tile("wide", TI.star, title, "Not playable", esc(pl.court.effNote || "")));
-    else if (!bw) out.push(tile("wide", TI.star, title, "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
-    else {
-      const end = DATA.times[bw.i + 2] || DATA.times[bw.i + 1];
-      const who = pl.kind === "me" ? ` at ${esc(pl.src.best[bw.i].c.name)}` : "";
-      out.push(tile(`wide best ${bandOf(bw.avg)}`, TI.star, title,
-        `${fmtTime(DATA.times[bw.i])} – ${fmtTime(end).split(" ").slice(1).join(" ")}`, `Score ${bw.avg.toFixed(1)}${who}`,
-        `<div class="mini">${Array.from({ length: Math.min(12, DATA.times.length - h) }, (_, k) => {
-          const i = h + k;
-          return `<i class="${pl.src.b[i]}${i === bw.i || i === bw.i + 1 ? " pick" : ""}${DATA.is_day[i] ? "" : " dark"}" title="${fmtTime(DATA.times[i])}: ${pl.src.s[i].toFixed(1)}"></i>`;
-        }).join("")}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>+12h</span></div>`));
-    }
-
-    // 2. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
+    // 1. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
     if (wx && wx.f.daily) {
       const D = wx.f.daily, lo = Math.min(...D.temperature_2m_min), hi = Math.max(...D.temperature_2m_max), span = Math.max(1, hi - lo);
       const today = pacificHourStamp().slice(0, 10);
@@ -1516,7 +1491,7 @@
       out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><ul class="ten">${rows}</ul></div>`);
     } else out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><div class="tile-note">Loading…</div></div>`);
 
-    // 3. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
+    // 2. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
     const n = Math.min(24, DATA.times.length - h);
     let total = 0, next = null;
     const bars = Array.from({ length: n }, (_, k) => {
@@ -1530,7 +1505,7 @@
       next === h ? "Rain likely now" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : "No rain expected",
       `<div class="pbars">${bars}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>Chance of rain each hour</span><span>+${n}h</span></div>`));
 
-    // 4. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
+    // 3. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
     const w = round(rd.at("w", h)), g = round(rd.at("g", h)), dir = rd.at("d", h) || 0;
     const wb = g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
     out.push(tile(`wind ${wb}`, TI.wind, "Wind", `${w}<small> mph</small>`, `Gusts ${g} mph<br>From ${compass(dir)}`,
@@ -1538,7 +1513,7 @@
         ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
         <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
 
-    // 5. Air quality (US AQI)
+    // 4. Air quality (US AQI)
     const aqi = rd.at("aqi", h);
     if (aqi != null) {
       const [, label, color, note] = aqiBand(aqi), pm = rd.at("pm25", h);
@@ -1546,7 +1521,7 @@
         `<div class="aqbar"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
     } else out.push(tile("aqi", TI.leaf, "Air quality", "—", wx ? "Not available here" : "Loading…"));
 
-    // 6. UV
+    // 5. UV
     const uv = rd.at("uv", h);
     if (uv != null) {
       const di = wx && wx.f.daily ? wx.f.daily.time.indexOf(DATA.times[h].slice(0, 10)) : -1;
@@ -1555,17 +1530,17 @@
         `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
     }
 
-    // 7. Humidity + dew point
+    // 6. Humidity + dew point
     const hu = round(rd.at("hu", h)), dp = round(rd.at("dp", h)), t = round(rd.at("t", h));
     if (hu != null) out.push(tile("humid", TI.drop, "Humidity", `${hu}<small>%</small>`,
       `${dp != null ? `Dew point ${dp}°<br>` : ""}${hu < 25 ? "Very dry. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play slower." : "Comfortable"}`));
 
-    // 8. Feels like
+    // 7. Feels like
     const ft = round(rd.at("ft", h));
     if (ft != null) out.push(tile("feels", TI.temp, "Feels like", `${ft}°`,
       Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer"));
 
-    // 9. Visibility
+    // 8. Visibility
     const vis = rd.at("vis", h);
     if (vis != null) {
       const mi = vis / 1609;
@@ -1573,7 +1548,7 @@
         mi >= 10 ? "Perfectly clear" : mi >= 5 ? "Light haze" : mi >= 1 ? "Hazy" : "Fog. Hard to track the ball."));
     }
 
-    // 10. Pressure, and which way it's heading (falling pressure often means weather is on the way).
+    // 9. Pressure, and which way it's heading (falling pressure often means weather is on the way).
     const pr = rd.at("pr", h);
     if (pr != null) {
       const earlier = rd.time("pr", DATA.times[h].slice(0, 11) + String(Math.max(0, Number(DATA.times[h].slice(11, 13)) - 3)).padStart(2, "0") + ":00");
@@ -1582,7 +1557,7 @@
         Math.abs(dlt) < 0.7 ? "Steady" : dlt > 0 ? "↑ Rising: settled weather" : "↓ Falling: weather may change"));
     }
 
-    // 11. Sunrise & sunset, with the sun's place along today's arc.
+    // 10. Sunrise & sunset, with the sun's place along today's arc.
     const sun = sunTimes(DATA.times[h].slice(0, 10), rd);
     if (sun) {
       const r0 = hoursOf(sun.rise), s0 = hoursOf(sun.set), now = Number(DATA.times[h].slice(11, 13)) + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
