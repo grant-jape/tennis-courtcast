@@ -550,12 +550,13 @@ dialog.acct::backdrop { background: rgb(15 20 25 / .45); }
 .crowdtag.few { background: var(--iffy-soft); }
 .crowdtag.open { background: var(--play-soft); }
 
-/* "At a court?" button, under the zoom buttons. */
+/* "At a court?" button: left of the zoom buttons (MapLibre puts them 10px in, 29px wide). */
 .locate {
-  position: absolute; top: 118px; right: 10px; z-index: 2; border: 0; cursor: pointer;
+  position: absolute; top: 10px; right: 47px; z-index: 2; border: 0; cursor: pointer; height: 32px;
   background: var(--surface); color: var(--ink); font-weight: 800; font-size: 13px;
-  border-radius: 999px; padding: 8px 12px; box-shadow: var(--shadow);
+  border-radius: 999px; padding: 0 12px; box-shadow: var(--shadow); display: inline-flex; align-items: center;
 }
+.locate[hidden] { display: none; }
 
 /* Small pop-up message along the top of the map. */
 .toast {
@@ -655,6 +656,8 @@ dialog.acct::backdrop { background: rgb(15 20 25 / .45); }
   .lbl { font-size: 11.5px; padding: 1.5px 5px; margin-top: 1px; }
   .acct-btn .who { display: none; }
   .acct-btn:has(.av) { padding: 4px; }
-  .locate { top: 118px; right: 8px; }
+  /* phones: just the pin, so it fits beside the zoom buttons next to the Play/Wind/Rain switch */
+  .locate { width: 32px; padding: 0; justify-content: center; font-size: 15px; }
+  .locate .ltxt { display: none; }
   .toast { top: 8px; }
 }
