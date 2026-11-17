@@ -15,7 +15,7 @@ from . import config as C
 URL = "https://api.open-meteo.com/v1/forecast"
 
 
-def _get(params, retries=5):
+def _get(params, retries=6):
     """GET with retries. GitHub's runners share IP addresses with other projects,
     so Open-Meteo's per-IP rate limit (HTTP 429) can trip from someone else's
     traffic; those waits need to be long (and follow Retry-After when given)."""
@@ -30,7 +30,10 @@ def _get(params, retries=5):
                 raise
             if e.code == 429:
                 hint = e.headers.get("Retry-After")
-                wait = int(hint) if hint and hint.isdigit() else 30 * 2 ** attempt   # 30, 60, 120, 240 s
+                backoff = 30 * 2 ** attempt   # 30, 60, 120, 240 s
+                # Follow the server's hint, but never retry instantly: a "Retry-After: 0" from a busy,
+                # shared IP otherwise burns every retry in a second.
+                wait = max(int(hint), 15 * (attempt + 1)) if hint and hint.isdigit() else backoff
                 print(f"rate limited (429); waiting {wait}s before retry {attempt + 2}/{retries}", flush=True)
                 time.sleep(min(wait, 300))
             else:
