@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Tennis CourtCast</title>
   <meta name="description" content="Court-by-court tennis weather for the Inland Empire: is it good to play, and where?">
+  <meta name="theme-color" content="#3f86d6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -15,57 +16,52 @@
   <header class="top">
     <div class="brand">
       <span class="ball" aria-hidden="true"></span>
-      <div>
-        <h1>Tennis CourtCast</h1>
-        <div id="updated" class="muted small">Loading forecast…</div>
-      </div>
+      <h1>Tennis CourtCast</h1>
     </div>
-    <div class="controls">
-      <div class="seg" role="group" aria-label="What to show on the map">
-        <button data-layer="play" aria-pressed="true"><span class="dot ball-dot" aria-hidden="true"></span> Play</button>
-        <button data-layer="wind" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6h8.2a2.2 2.2 0 1 0-2.1-2.9M1.5 10h11a2 2 0 1 1-1.9 2.6M1.5 8h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Wind</button>
-        <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
-      </div>
-      <label class="toggle"><input type="checkbox" id="schools"><span class="track" aria-hidden="true"></span> Schools</label>
-      <button id="acctBtn" class="acct-btn" hidden>Sign in</button>
-    </div>
+    <button id="acctBtn" class="acct-btn" hidden>Sign in</button>
   </header>
 
   <main class="layout">
+    <!-- Weather panel: the region, or the court you tapped. On phones its sections
+         interleave with the map (see the CSS "order" rules). -->
+    <aside class="panel">
+      <section id="hero" class="hero" aria-live="polite"></section>
+
+      <section class="hourly-wrap">
+        <div class="sect-title">Hourly forecast <span class="muted">· tap an hour</span></div>
+        <div id="hourly" class="hourly" role="listbox" aria-label="Forecast hours" tabindex="0"></div>
+      </section>
+
+      <section id="tiles" class="tiles" aria-label="Conditions"></section>
+
+      <section id="favWrap" class="listwrap" hidden>
+        <h2 class="sect-title">★ Your courts</h2>
+        <ol id="favList" class="list"></ol>
+      </section>
+
+      <footer class="foot muted small">
+        <span id="updated">Loading forecast…</span>
+        · <a href="privacy.html">Privacy</a>
+        · Weather: <a href="https://open-meteo.com/">Open-Meteo</a>
+      </footer>
+    </aside>
+
     <section class="mapwrap">
       <div id="map" aria-label="Map of tennis courts and conditions"></div>
-      <div class="legend" id="legend"></div>
+      <div class="mapbar">
+        <div class="seg" role="group" aria-label="What to show on the map">
+          <button data-layer="play" aria-pressed="true"><span class="dot ball-dot" aria-hidden="true"></span> Play</button>
+          <button data-layer="wind" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6h8.2a2.2 2.2 0 1 0-2.1-2.9M1.5 10h11a2 2 0 1 1-1.9 2.6M1.5 8h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Wind</button>
+          <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="schools"><span class="track" aria-hidden="true"></span> Schools</label>
+        <div class="legend" id="legend"></div>
+      </div>
       <button id="locateBtn" class="locate" hidden><span aria-hidden="true">📍</span> At a court?</button>
       <div id="toast" class="toast" role="status" hidden></div>
       <article id="card" class="card" hidden aria-live="polite"></article>
     </section>
-
-    <aside class="panel">
-      <section id="favWrap" hidden>
-        <h2>★ Your courts</h2>
-        <ol id="favList" class="list"></ol>
-      </section>
-      <h2 id="listTitle">Best courts</h2>
-      <ol id="list" class="list"></ol>
-    </aside>
   </main>
-
-  <footer class="timebar">
-    <div class="timehead">
-      <button id="prev" class="round" aria-label="Previous hour">‹</button>
-      <div class="when" aria-live="polite">
-        <div id="timeLabel" class="big">—</div>
-        <div id="dayLabel" class="muted small"></div>
-      </div>
-      <button id="next" class="round" aria-label="Next hour">›</button>
-      <button id="now" class="nowbtn">Now</button>
-    </div>
-    <div class="slider">
-      <div id="track" class="track" aria-hidden="true"></div>
-      <input type="range" id="hour" min="0" max="35" value="0" aria-label="Forecast hour">
-      <div id="ticks" class="ticks" aria-hidden="true"></div>
-    </div>
-  </footer>
 
   <!-- Sign in / create account / profile. Screens are drawn by app.js into #acctBody. -->
   <dialog id="acct" class="acct" aria-label="Your account">

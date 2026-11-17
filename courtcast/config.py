@@ -28,7 +28,14 @@ HOURLY_VARS = [
     "wind_gusts_10m",
     "wind_direction_10m",
     "is_day",
+    # Extra detail for the weather panel (courts only; the map grid doesn't use them).
+    "weather_code",            # WMO code: clear / cloudy / fog / drizzle / rain / thunder
+    "apparent_temperature",    # "feels like"
+    "relative_humidity_2m",
+    "uv_index",
+    "cloud_cover",
 ]
+DAILY_VARS = ["sunrise", "sunset", "temperature_2m_max", "temperature_2m_min"]
 HOURS_AHEAD = 42            # data rebuilds every ~2 h, so this leaves >= 36 h ahead of the real clock
 LOCATIONS_PER_REQUEST = 50  # keeps request URLs a sane length
 
