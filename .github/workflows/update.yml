@@ -2,7 +2,9 @@ name: Update forecast
 
 on:
   schedule:
-    - cron: "23 */2 * * *"   # every 2 hours, off the top of the hour (GitHub's busiest minute)
+    # The main timer is a Cloudflare Worker (cron/forecast-trigger.js) that starts this workflow every 2 hours.
+    # GitHub's own schedule is best-effort (often hours late), so it's only a backup now.
+    - cron: "47 */6 * * *"
   workflow_dispatch:          # "Run workflow" button in the Actions tab
   push:
     paths: ["courts.csv", "courtcast/**", "site/**", ".github/workflows/update.yml"]

@@ -76,18 +76,18 @@ button, input { font: inherit; }
 .setrow > span { display: flex; flex-direction: column; gap: 1px; }
 .setrow b { font-weight: 800; color: var(--ink); }
 /* an iOS-style switch, drawn from a plain checkbox */
-.switch {
+.toggle-switch {
   appearance: none; -webkit-appearance: none; flex: none; width: 46px; height: 28px; border-radius: 999px;
   background: var(--line); position: relative; cursor: pointer; transition: background .15s; margin: 0;
 }
-.switch::after {
+.toggle-switch::after {
   content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
   background: #fff; box-shadow: var(--shadow-sm); transition: transform .15s;
 }
-.switch:checked { background: var(--play); }
-.switch:checked::after { transform: translateX(18px); }
-.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.switch:disabled { opacity: .45; cursor: default; }
+.toggle-switch:checked { background: var(--play); }
+.toggle-switch:checked::after { transform: translateX(18px); }
+.toggle-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle-switch:disabled { opacity: .45; cursor: default; }
 .acct button.wide {
   width: 100%; margin-top: 14px; border: 0; border-radius: 999px; padding: 10px; font-weight: 800;
   cursor: pointer; background: var(--page); color: var(--ink);
@@ -477,6 +477,8 @@ dialog.acct::backdrop { background: rgb(15 20 25 / .45); }
   font: 600 15px/1 Roboto, Nunito, system-ui, sans-serif;
 }
 .gbtn:hover { background: #f8f9fa; }
+.gbtn[hidden] { display: none; }
+.gsi { display: flex; justify-content: center; min-height: 44px; }
 .gbtn .g { width: 20px; height: 20px; }
 @media (prefers-color-scheme: dark) {
   .gbtn { background: #131314; border-color: #8e918f; color: #e3e3e3; }
