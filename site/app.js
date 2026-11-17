@@ -1099,7 +1099,10 @@
     return best;
   };
   function buildRegion() {
-    const cs = DATA.courts.filter((c) => c.type !== "school" && c.status !== "closed");
+    REGION = summarize(DATA.courts.filter((c) => c.type !== "school" && c.status !== "closed"));
+  }
+  // The typical (median) court of a set, hour by hour: a stand-in "place" for an area.
+  function summarize(cs) {
     const H = DATA.times.length;
     const at = (k, f, round = true) => Array.from({ length: H }, (_, h) => {
       const v = f(cs.map((c) => (c[k] ? c[k][h] : null)));
@@ -1109,7 +1112,7 @@
       const v = median(cs.map((c) => (c[k] || [])[i]));
       return v == null ? null : Math.round(v);
     });
-    REGION = {
+    const out = {
       total: cs.length, t: at("t", median), ft: at("ft", median), hu: at("hu", median), cc: at("cc", median),
       uv: at("uv", median, false), w: at("w", median), g: at("g", median), p: at("p", median),
       r: at("r", median, false), wc: at("wc", mode), s: at("s", median, false), hi: day("hi"), lo: day("lo"),
@@ -1121,7 +1124,39 @@
       }),
       good: Array.from({ length: H }, (_, h) => cs.filter((c) => c.b[h] === "play").length),
     };
-    REGION.b = REGION.s.map((s) => bandOf(s));
+    out.b = out.s.map((s) => bandOf(s));
+    return out;
+  }
+
+  // ---------- the panel follows the map ----------
+  // Zoomed in to city level, the panel shows the city with the most courts on screen, with live
+  // weather for the middle of the map and scores for the courts in view. Zoomed out, it goes back
+  // to you (or the whole region).
+  const VIEW_ZOOM = 11;
+  let viewKey = "";
+  function updateView() {
+    if (!DATA || !map) return;
+    let v = null;
+    if (map.getZoom() >= VIEW_ZOOM) {
+      const bb = map.getBounds();
+      const inView = DATA.courts.filter((c) => c.lat >= bb.getSouth() && c.lat <= bb.getNorth()
+        && c.lon >= bb.getWest() && c.lon <= bb.getEast());
+      const shown = inView.filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed");
+      if (shown.length) {
+        const tally = new Map();
+        inView.forEach((c) => tally.set(c.city, (tally.get(c.city) || 0) + 1));
+        const name = [...tally].sort((a, b) => b[1] - a[1])[0][0];
+        const ctr = map.getCenter();
+        // Centre rounded to ~2 km: small pans reuse the same live forecast.
+        v = { name, n: shown.length, lat: Math.round(ctr.lat * 50) / 50, lon: Math.round(ctr.lng * 50) / 50, ids: shown.map((c) => c.id) };
+      }
+    }
+    const key = v ? `${v.name}|${v.lat},${v.lon}|${v.ids.join(",")}|${state.schools}` : "";
+    if (key === viewKey) return;
+    viewKey = key;
+    if (v) v.sum = summarize(v.ids.map((id) => DATA.courts.find((c) => c.id === id)));
+    state.view = v;
+    if (!state.selected) renderPanel();
   }
 
   // You: set once you tap "Use my location" (and remembered for next time).
@@ -1137,6 +1172,10 @@
   function place() {
     const ct = state.selected && DATA.courts.find((c) => c.id === state.selected);
     if (ct) return { kind: "court", name: ct.name, sub: ct.city, lat: ct.lat, lon: ct.lon, src: ct, fb: ct, court: ct };
+    const v = state.view;
+    if (v && !(ME.pos && meters(v.lat, v.lon, ME.pos.lat, ME.pos.lon) < 3000)) {
+      return { kind: "view", name: v.name, sub: `${v.n} court${v.n === 1 ? "" : "s"} on screen`, lat: v.lat, lon: v.lon, src: v.sum, fb: v.sum };
+    }
     if (ME.pos) {
       const near = nearestCourts(ME.pos.lat, ME.pos.lon);
       const best = DATA.times.map((_, h) => near.reduce((a, x) => (!a || x.c.s[h] > a.c.s[h] ? x : a), null));
@@ -1321,15 +1360,16 @@
       verdict = `<b>${BAND[b].face} ${BAND[b].label} nearby · ${s.toFixed(1)}</b>
         <span>Best near you: <button class="link inline" data-court="${x.c.id}">${esc(x.c.name)}</button> · ${(x.m / 1609).toFixed(1)} mi</span>`;
     } else {
-      const good = REGION.good[h];
-      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${REGION.total} courts` : `${BAND[b].label} across the area`}</b>
+      const good = pl.src.good[h], here = pl.kind === "view" ? " here" : "";
+      verdict = `<b>${BAND[b].face} ${good ? `Good to play at ${good} of ${pl.src.total} court${pl.src.total === 1 ? "" : "s"}${here}` : `${BAND[b].label} ${here ? "here" : "across the area"}`}</b>
         <span>Typical score ${s.toFixed(1)} / 10</span>`;
     }
     const when = now ? `<span class="live-dot"></span>Now · ${clockText()}` : `${fmtTime(DATA.times[h])} · in ${h - state.base} h`;
     const canLocate = !!navigator.geolocation;
     let top;
-    if (pl.kind === "court") top = `<button class="back" data-act="all">‹ ${ME.pos ? esc(ME.name) : "All courts"}</button>`;
+    if (pl.kind === "court") top = `<button class="back" data-act="all">‹ ${state.view ? esc(state.view.name) : ME.pos ? esc(ME.name) : "All courts"}</button>`;
     else if (pl.kind === "me") top = '<div class="eyebrow">📍 Your location</div>';
+    else if (pl.kind === "view") top = `<div class="eyebrow">🗺 On the map · ${esc(pl.sub)}</div>`;
     else top = `<div class="eyebrow">Tennis weather</div>`;
     $("hero").className = `hero sky-${skyOf(rd, h)}`;
     $("hero").innerHTML = `
@@ -1426,7 +1466,7 @@
 
     // 1. Best time to play (next 12 hours of daylight)
     const bw = closed ? null : bestWindow(pl.src, h);
-    const title = pl.kind === "me" ? "Best time to play near you" : "Best time to play";
+    const title = pl.kind === "me" ? "Best time to play near you" : pl.kind === "view" ? "Best time to play here" : "Best time to play";
     if (closed) out.push(tile("wide", TI.star, title, "Not playable", esc(pl.court.effNote || "")));
     else if (!bw) out.push(tile("wide", TI.star, title, "After sunrise", "No daylight in the next 12 hours. Lit courts only until then."));
     else {
@@ -1765,8 +1805,9 @@
     }));
     $("schools").addEventListener("change", (e) => {
       state.schools = e.target.checked;
+      viewKey = "";
       store.set("cc-schools", state.schools ? "on" : "off");
-      render(); saveHash();
+      render(); saveHash(); updateView();
     });
     $("settingsBtn").addEventListener("click", openSettings);
     $("settings").addEventListener("click", (e) => {
@@ -1828,7 +1869,7 @@
     });
     map.on("mouseenter", "court-dots", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "court-dots", () => { map.getCanvas().style.cursor = ""; });
-    map.on("moveend", renderPins);   // pins follow what's on screen
+    map.on("moveend", () => { renderPins(); updateView(); });   // pins and the weather panel follow the map
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
     map.on("zoom", names);
