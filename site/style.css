@@ -382,6 +382,26 @@ body { height: 100dvh; }
   color: var(--ink); font-weight: 700; font-size: 13px; text-decoration: none;
 }
 .links a:hover { background: color-mix(in srgb, var(--accent) 12%, var(--page)); }
+.links button {
+  flex: 1; padding: 7px 10px; border: 0; border-radius: 999px; background: var(--page); color: var(--ink-2);
+  font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.links button:hover { background: color-mix(in srgb, var(--skip) 10%, var(--page)); }
+.status.hiddenc { background: var(--page); color: var(--ink-2); }
+/* a court you've hidden: still there (tap to unhide), but faded and underneath the rest */
+/* (fade the insides: MapLibre sets an inline opacity on the marker itself) */
+.court-marker.hidden-court > * { opacity: .2; transition: opacity .15s; }
+.court-marker.hidden-court:hover > * { opacity: .6; }
+/* "Hidden courts · Unhide all" in Settings */
+.acct div.setrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0;
+  border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; color: var(--ink-2);
+}
+.pill-btn {
+  flex: none; border: 0; border-radius: 999px; padding: 7px 14px; background: var(--page); color: var(--ink);
+  font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+}
+.pill-btn[hidden] { display: none; }
 
 /* Court condition votes + comments, at the bottom of the court card. */
 .community { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }

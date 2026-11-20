@@ -167,6 +167,14 @@
     get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* fine */ } },
   };
+  // Courts you've hidden (kept in this browser). A hidden court stays on the map, faded and
+  // underneath the others, and drops out of "best near you" and the counts. Tap it to unhide.
+  const hiddenCourts = new Set((() => { try { return JSON.parse(store.get("cc-hidden") || "[]"); } catch (_) { return []; } })());
+  const isHidden = (id) => hiddenCourts.has(id);
+  function setHidden(id, on) {
+    if (on) hiddenCourts.add(id); else hiddenCourts.delete(id);
+    store.set("cc-hidden", JSON.stringify([...hiddenCourts]));
+  }
 
   // A court the group hasn't marked in courts.csv still gets flagged from recent reviews
   // (last 90 days), when at least two players agree and they outnumber everyone else:
@@ -547,6 +555,7 @@
   async function toggleFavorite(id) {
     if (!community.user) { openAccount("signin", "Sign in to save your favorite courts."); return; }
     const on = community.favorites.has(id);
+    if (!on && isHidden(id)) setHidden(id, false);   // starring a hidden court brings it back
     const flip = () => { if (on) community.favorites.add(id); else community.favorites.delete(id); };
     if (on) community.favorites.delete(id); else community.favorites.add(id);   // show it right away
     renderMarkers(); renderList(); renderCard();
@@ -789,7 +798,14 @@
   // Clicks inside the court card and the pop-up message.
   async function onCommunityClick(e) {
     const t = e.target.closest("[data-act], [data-vote], [data-del], [data-report]");
-    if (!t || !sb || t.tagName === "FORM") return;
+    if (!t || t.tagName === "FORM") return;
+    if (t.dataset.act === "hide" || t.dataset.act === "unhide") {   // works signed out, too
+      e.preventDefault();
+      if (t.closest("#toast")) hideToast();
+      hideCourt(t.dataset.court || state.selected, t.dataset.act === "hide");
+      return;
+    }
+    if (!sb) return;
     e.preventDefault();
     const box = t.closest(".community"), msg = box && box.querySelector(".msg");
     const say = (text) => { if (msg) msg.textContent = text; else toast(esc(text)); };
@@ -993,6 +1009,7 @@
   // How notable a court is for the current view; higher sits on top when markers overlap.
   function notability(ct, h) {
     if (ct.id === state.selected) return 1e6;
+    if (isHidden(ct.id)) return -5;                    // hidden courts sit underneath everything
     if (ct.eff === "closed") return 0;                 // closed courts sink under the others
     const school = ct.type === "school" ? 0 : 1e5;
     if (state.layer === "wind") return school + ct.g[h];
@@ -1015,8 +1032,9 @@
       // A closed court is gray with a ✕ whatever the weather.
       const b = bandAt(ct, h);
       el.classList.toggle("selected", state.selected === ct.id);
+      el.classList.toggle("hidden-court", isHidden(ct.id) && state.selected !== ct.id);
       el.setAttribute("aria-label", ct.eff === "closed" ? `${ct.name}: not playable` :
-        `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.eff === "poor" ? ", rough court" : ""}`);
+        `${ct.name}: ${BAND[b].label}, ${ct.s[h]} out of 10${ct.eff === "poor" ? ", rough court" : ""}${isHidden(ct.id) ? ", hidden by you" : ""}`);
       // Small court icon with the number beside it, always visible at every zoom.
       // Court icon (coloured by playability) on top; the number on a white label underneath.
       // A live "how many are open" report puts a dot on the court (red full, amber 1 open, green open);
@@ -1132,7 +1150,7 @@
       const bb = map.getBounds();
       const inView = DATA.courts.filter((c) => c.lat >= bb.getSouth() && c.lat <= bb.getNorth()
         && c.lon >= bb.getWest() && c.lon <= bb.getEast());
-      const shown = inView.filter((c) => visible(c) && c.eff !== "closed");
+      const shown = inView.filter((c) => visible(c) && c.eff !== "closed" && !isHidden(c.id));
       if (shown.length) {
         const tally = new Map();
         inView.forEach((c) => tally.set(c.city, (tally.get(c.city) || 0) + 1));
@@ -1155,7 +1173,7 @@
   const ME = { pos: null, exact: null, name: "", busy: false, marker: null };
   const REGION_CENTER = { lat: 33.93, lon: -118.0 };
   function nearestCourts(lat, lon, n = 3) {
-    return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
+    return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed" && !isHidden(c.id))
       .map((c) => ({ c, m: meters(lat, lon, c.lat, c.lon) })).sort((a, b) => a.m - b.m).slice(0, n);
   }
 
@@ -1215,7 +1233,7 @@
     if (!chip) return;
     chip.hidden = mode === "all";
     if (mode === "all") return;
-    const n = DATA.courts.filter((c) => visible(c, mode)).length;
+    const n = DATA.courts.filter((c) => visible(c, mode) && !isHidden(c.id)).length;
     const what = mode === "fav" ? "★ Your courts" : `📍 Within ${filt.radius} mi`;
     chip.innerHTML = `${what} <span class="muted">· ${n} court${n === 1 ? "" : "s"}</span>`;
     chip.setAttribute("aria-label", `${mode === "fav" ? "Showing your favorite courts" : `Showing courts within ${filt.radius} miles`}, ${n}. Change which courts show`);
@@ -1689,6 +1707,18 @@
     map.easeTo({ center: [mk.ct.lon, mk.ct.lat], zoom: Math.max(map.getZoom(), 12.5), padding, duration: 600 });
   }
 
+  // Hide: close the card so you see the court fade; the toast offers Undo. Unhide: stay on the court.
+  function hideCourt(id, on) {
+    const ct = DATA.courts.find((c) => c.id === id);
+    if (!ct) return;
+    setHidden(id, on);
+    if (on && state.selected === id) closeCard(); else render();
+    updateView();
+    syncFilterControls();
+    toast(on ? `<b>${esc(ct.name)}</b> is hidden. <a href="#" data-act="unhide" data-court="${id}">Undo</a>`
+      : `<b>${esc(ct.name)}</b> is back on your map.`);
+  }
+
   // MapLibre keeps camera padding until it's reset, so clear it when the card closes.
   function closeCard() {
     state.selected = null;
@@ -1710,16 +1740,18 @@
     const draft = typing && typing.value ? { text: typing.value, focused: document.activeElement === typing } : null;
     const keepScroll = card.dataset.court === ct.id ? card.scrollTop : 0;
     card.dataset.court = ct.id;
-    const fav = community.favorites.has(ct.id);
+    const fav = community.favorites.has(ct.id), hid = isHidden(ct.id);
+    const hiddenNote = hid ? '<div class="status hiddenc"><b>Hidden from your map</b> · faded, and left out of "best near you"</div>' : "";
     card.innerHTML = `
       <button class="x" aria-label="Close">×</button>
       ${sb ? `<button class="fav${fav ? " on" : ""}" data-act="fav" aria-pressed="${fav}" aria-label="${fav ? "Remove from" : "Add to"} your courts" title="${fav ? "In your courts" : "Add to your courts"}">${fav ? "★" : "☆"}</button>` : ""}
       <div class="head">${courtSvg(ct.eff === "closed" ? "closed" : b)}<div><h3>${ct.name}</h3><div class="muted small">${ct.city}${ct.type === "school" ? " · school courts, access varies" : ""}</div></div>
         ${ct.eff === "closed" ? "" : `<span class="card-score ${b}" title="${BAND[b].label} at ${fmtTime(DATA.times[h])}">${ct.s[h].toFixed(1)}</span>`}</div>
-      ${banner}
+      ${banner}${hiddenNote}
       <div class="links">
         <a href="${mapsUrl(ct)}" target="_blank" rel="noopener">📍 Directions</a>
         <a href="${streetUrl(ct)}" target="_blank" rel="noopener">🚶 Street View</a>
+        <button type="button" data-act="${hid ? "unhide" : "hide"}" title="${hid ? "Show this court normally again" : "Fade this court on your map"}">${hid ? "Unhide" : "Hide court"}</button>
       </div>
       ${sb ? crowdHtml(ct) : ""}
       ${communityHtml(ct)}`;
@@ -1892,6 +1924,9 @@
     $("radiusOut").textContent = `${filt.radius} mi`;
     $("radiusRow").hidden = !filt.near;
     $("setFavOnly").checked = filt.favOnly;
+    const n = hiddenCourts.size;
+    $("hiddenCount").textContent = n ? `${n} court${n === 1 ? "" : "s"} faded on your map (this browser)` : "None. Hide a court from its card.";
+    $("unhideAll").hidden = !n;
   }
 
   // ---------- wiring ----------
@@ -1907,6 +1942,10 @@
     });
     $("settingsBtn").addEventListener("click", openSettings);
     $("filterChip").addEventListener("click", openSettings);
+    $("unhideAll").addEventListener("click", () => {
+      [...hiddenCourts].forEach((id) => setHidden(id, false));
+      syncFilterControls(); render(); updateView();
+    });
     // Which courts show. Changing a setting zooms to the courts it now shows.
     $("setNear").addEventListener("change", (e) => {
       filt.near = e.target.checked;
