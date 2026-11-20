@@ -221,6 +221,26 @@ body { height: 100dvh; }
 .tile-big small { font-size: 14px; color: var(--ink-2); font-weight: 800; }
 .tile-note { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; font-weight: 600; }
 .tile.best .tile-big { font-size: 22px; }
+/* tennis tiles: a word for how it plays, the numbers behind it, then what it means on court */
+.tile-word { font-size: 21px; font-weight: 900; line-height: 1.15; margin-top: 4px; color: var(--ink); }
+.tile-meas { font-size: 12px; font-weight: 800; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; }
+.tile-word + .tile-note, .tile-meas + .tile-note { margin-top: 6px; line-height: 1.4; }
+/* "How it plays": a coloured edge for the overall verdict, and tip chips */
+.tile.howplays { border-left: 6px solid var(--play); }
+.tile.howplays.iffy { border-left-color: var(--iffy); }
+.tile.howplays.skip { border-left-color: var(--skip); }
+.tile.howplays .tile-word { font-size: 24px; }
+.tile.howplays .tile-note { font-size: 13.5px; color: var(--ink); }
+.tips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.tips span { background: var(--page); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.tile.precip.court-skip .tile-word { color: var(--skip); }
+.tile.precip.court-iffy .tile-word { color: #c98a00; }
+/* 10-day: a tennis word under each day */
+.ten .dd { display: flex; flex-direction: column; line-height: 1.1; }
+.ten .tag { font-size: 10.5px; font-weight: 900; letter-spacing: .02em; margin-top: 2px; }
+.ten .tag.play { color: var(--play); }
+.ten .tag.iffy { color: #c98a00; }
+.ten .tag.skip { color: var(--skip); }
 .mini { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin-top: 9px; align-items: end; }
 .mini i { height: 8px; border-radius: 4px; }
 .mini i.play { background: var(--play); }
