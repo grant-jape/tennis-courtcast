@@ -137,6 +137,10 @@
     summary: new Map(), comments: new Map(), myVote: new Map(), loading: new Set(),
     favorites: new Set(), activity: new Map(), near: null,
   };
+  // Settles once we know the signed-in player's ★ courts (or that there's no one signed in),
+  // so the map can open on them.
+  let mineDone;
+  const mineReady = new Promise((ok) => { mineDone = ok; });
   const RATING = {
     great: { label: "Great", face: "👍" },
     okay: { label: "Okay", face: "👌" },
@@ -185,7 +189,7 @@
   }
 
   async function initCommunity() {
-    if (!sb) return;
+    if (!sb) { mineDone(); return; }
     try {   // Each sign-in option appears once it's switched on in Supabase (no code change needed).
       const ext = (await (await fetch(`${SB_URL}/auth/v1/settings`, { headers: { apikey: SB_KEY } })).json()).external || {};
       community.googleReady = !!ext.google;
@@ -194,6 +198,7 @@
     const { data } = await sb.auth.getSession();
     community.user = (data.session && data.session.user) || null;
     await loadMine();
+    mineDone();
     sb.auth.onAuthStateChange((event, session) => {
       const before = community.user && community.user.id;
       community.user = (session && session.user) || null;
@@ -970,6 +975,9 @@
       const m = new maplibregl.Marker({ element: el, anchor: "top", offset: [0, -11] }).setLngLat([ct.lon, ct.lat]);
       markers.push({ ct, el, m, shown: false });
     });
+    map.addSource("near-ring", { type: "geojson", data: ringFeature() });
+    map.addLayer({ id: "near-ring", type: "line", source: "near-ring",
+      paint: { "line-color": css("--accent"), "line-width": 2, "line-opacity": 0.55, "line-dasharray": [2, 2] } });
     map.addSource("court-dots", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({
       id: "court-dots", type: "circle", source: "court-dots", maxzoom: PIN_ZOOM,
@@ -985,8 +993,9 @@
   function renderDots() {
     const src = map.getSource("court-dots"), h = state.hour;
     if (!src) return;
+    const mode = filterMode();
     src.setData({ type: "FeatureCollection", features: markers
-      .filter(({ ct }) => state.schools || ct.type !== "school")
+      .filter(({ ct }) => visible(ct, mode))
       .map(({ ct }) => ({ type: "Feature", geometry: { type: "Point", coordinates: [ct.lon, ct.lat] },
         properties: { id: ct.id, color: PAL[bandAt(ct, h)] } })) });
   }
@@ -1010,15 +1019,16 @@
     return school + ct.s[h] * 10;
   }
 
-  function renderMarkers() { renderDots(); renderPins(); }
+  function renderMarkers() { renderDots(); renderPins(); renderRing(); renderFilter(); }
+  function renderRing() { const src = map.getSource("near-ring"); if (src) src.setData(ringFeature()); }
   function renderPins() {
-    const h = state.hour, pins = map.getZoom() >= PIN_ZOOM;
+    const h = state.hour, pins = map.getZoom() >= PIN_ZOOM, mode = filterMode();
     const bb = map.getBounds(), dLat = (bb.getNorth() - bb.getSouth()) * 0.2, dLon = (bb.getEast() - bb.getWest()) * 0.2;
     markers.forEach((mk) => {
       const { ct, el, m } = mk;
       const inView = ct.lat > bb.getSouth() - dLat && ct.lat < bb.getNorth() + dLat
         && ct.lon > bb.getWest() - dLon && ct.lon < bb.getEast() + dLon;
-      const show = (state.schools || ct.type !== "school") && (ct.id === state.selected || (pins && inView));
+      const show = visible(ct, mode) && (ct.id === state.selected || (pins && inView));
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
       // A closed court is gray with a ✕ whatever the weather.
@@ -1141,7 +1151,7 @@
       const bb = map.getBounds();
       const inView = DATA.courts.filter((c) => c.lat >= bb.getSouth() && c.lat <= bb.getNorth()
         && c.lon >= bb.getWest() && c.lon <= bb.getEast());
-      const shown = inView.filter((c) => (state.schools || c.type !== "school") && c.eff !== "closed");
+      const shown = inView.filter((c) => visible(c) && c.eff !== "closed");
       if (shown.length) {
         const tally = new Map();
         inView.forEach((c) => tally.set(c.city, (tally.get(c.city) || 0) + 1));
@@ -1166,6 +1176,73 @@
   function nearestCourts(lat, lon, n = 3) {
     return DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
       .map((c) => ({ c, m: meters(lat, lon, c.lat, c.lon) })).sort((a, b) => a.m - b.m).slice(0, n);
+  }
+
+  // ---------- which courts are on the map: near you, your ★ courts, or all ----------
+  // One rule. Your ★ courts always show. With "near me" on, so do courts within `radius` miles of you;
+  // with "only my ★ courts" on, nothing else does. A court opened from a link always shows.
+  const MI = 1609.34, MI_PER_DEG_LAT = 69.05;
+  const filt = {
+    near: store.get("cc-near") !== "off",   // on unless turned off: most players stay local
+    radius: Math.min(50, Math.max(10, Number(store.get("cc-radius")) || 25)),
+    favOnly: store.get("cc-favonly") === "on",
+  };
+  // What's in force right now: a setting only applies once we have what it needs.
+  function filterMode() {
+    if (filt.favOnly && community.favorites.size) return "fav";
+    if (filt.near && ME.pos) return "near";
+    return "all";
+  }
+  function visible(ct, mode = filterMode()) {
+    if (ct.id === state.selected) return true;
+    const fav = community.favorites.has(ct.id);
+    if (!fav && !state.schools && ct.type === "school") return false;
+    if (mode === "all" || fav) return true;
+    return mode === "near" && meters(ME.pos.lat, ME.pos.lon, ct.lat, ct.lon) / MI <= filt.radius;
+  }
+  // A box around a circle of `mi` miles (a degree of longitude shrinks with cos(latitude)).
+  function circleBounds(pos, mi) {
+    const dLat = mi / MI_PER_DEG_LAT, dLon = dLat / Math.cos(pos.lat * Math.PI / 180);
+    return [[pos.lon - dLon, pos.lat - dLat], [pos.lon + dLon, pos.lat + dLat]];
+  }
+  // A dashed ring at the edge of "near me", so it's clear why the courts stop there.
+  function ringFeature() {
+    if (filterMode() !== "near") return { type: "FeatureCollection", features: [] };
+    const [[w, s], [e, n]] = circleBounds(ME.pos, filt.radius), rx = (e - w) / 2, ry = (n - s) / 2;
+    const coords = Array.from({ length: 97 }, (_, i) => {
+      const a = (i / 96) * 2 * Math.PI;
+      return [ME.pos.lon + rx * Math.cos(a), ME.pos.lat + ry * Math.sin(a)];
+    });
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } };
+  }
+  // Your ★ courts: the box around them, and how spread out they are (the box's corner-to-corner miles).
+  const FAV_CLUSTER_MI = 30;   // spread this small or less = "your area", worth opening on
+  const FAV_MAX_ZOOM = 12.5;   // a single favorite: its neighbourhood, close enough for pins (from 12)
+  function favArea() {
+    const fs = DATA.courts.filter((c) => community.favorites.has(c.id));
+    if (!fs.length) return null;
+    const lats = fs.map((c) => c.lat), lons = fs.map((c) => c.lon);
+    const sw = [Math.min(...lons), Math.min(...lats)], ne = [Math.max(...lons), Math.max(...lats)];
+    return { courts: fs, bounds: [sw, ne], spanMi: meters(sw[1], sw[0], ne[1], ne[0]) / MI };
+  }
+  function fitTo(bounds, maxZoom = 13, padding = homePadding()) {
+    map.fitBounds(bounds, { padding, maxZoom, duration: 700 });
+  }
+  // The chip on the map: what the rule is showing; tap it to change.
+  function renderFilter() {
+    const chip = $("filterChip"), mode = filterMode();
+    if (!chip) return;
+    chip.hidden = mode === "all";
+    if (mode === "all") return;
+    const n = DATA.courts.filter((c) => visible(c, mode)).length;
+    const what = mode === "fav" ? "★ Your courts" : `📍 Within ${filt.radius} mi`;
+    chip.innerHTML = `${what} <span class="muted">· ${n} court${n === 1 ? "" : "s"}</span>`;
+    chip.setAttribute("aria-label", `${mode === "fav" ? "Showing your favorite courts" : `Showing courts within ${filt.radius} miles`}, ${n}. Change which courts show`);
+  }
+  function applyFilter(fit) {
+    renderMarkers();
+    updateView();
+    if (fit) goHome();
   }
   // The place on screen: its name, where it is, the court scores that speak for it (`src`),
   // and fallback weather numbers (`fb`) from the 2-hourly build until live detail arrives.
@@ -1212,13 +1289,13 @@
   }
   function useMyLocation() {
     if (!geo) return;
-    if (ME.exact) {   // already found you: just recentre
+    const following = geo._watchState && geo._watchState !== "OFF";
+    if (ME.exact && following) {   // already showing you: just recentre
       map.flyTo({ center: [ME.exact.lon, ME.exact.lat], zoom: Math.max(map.getZoom(), LOCATE_ZOOM), duration: 900 });
       return;
     }
-    ME.busy = true;
-    renderHero();
-    geo.trigger();
+    if (!ME.exact) { ME.busy = true; renderHero(); }
+    geo.trigger();   // the blue dot, and fly to you
   }
   async function setMe(coords) {
     ME.busy = false;
@@ -1238,6 +1315,7 @@
       ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
       lastNamed = pos;
     }
+    renderMarkers();   // "near me" moves with you
     renderPanel();
     if (!renamed) return;
     try {
@@ -1253,13 +1331,43 @@
     ME.pos = ME.exact = null;
     ME.name = "";
     lastNamed = null;
+    renderMarkers();
     renderPanel();
   }
-  // Opening the site: if you've allowed location before (and haven't turned it off in Settings),
-  // fly straight to your area. First-time visitors aren't asked until they tap ◎ or "Use my location".
-  async function autoUseLocation() {
-    if (store.get("cc-useloc") === "off" || !navigator.permissions || !geo) return;
-    try { if ((await navigator.permissions.query({ name: "geolocation" })).state === "granted") useMyLocation(); } catch (_) { /* fine */ }
+
+  // ---------- where the map opens ----------
+  // Players stick to their own courts, so open there, not on all of SoCal:
+  //   1. your ★ courts, if they sit close together (or "only my ★ courts" is on), unless you're
+  //      travelling (farther than your radius from all of them);
+  //   2. else you, zoomed in on your neighbourhood (if you've allowed location before);
+  //   3. else the whole region.
+  // A link to a court, or the player moving the map first, beats all of these.
+  // First-time visitors still aren't asked for location until they tap ◎ or "Use my location".
+  let cameraTouched = false;
+  const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  async function locationAllowed() {
+    if (store.get("cc-useloc") === "off" || !navigator.permissions || !geo) return false;
+    try { return (await navigator.permissions.query({ name: "geolocation" })).state === "granted"; } catch (_) { return false; }
+  }
+  // Where you are, without moving the map or starting "follow me" (◎ still does both).
+  function quietLocate() {
+    return new Promise((ok) => navigator.geolocation.getCurrentPosition(
+      (p) => { setMe(p.coords); ok(true); }, () => ok(false),
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 }));
+  }
+  async function openHome() {
+    const [loc] = await Promise.all([locationAllowed(), Promise.race([mineReady, wait(4000)])]);
+    const free = () => !state.selected && !cameraTouched;
+    const fa = favArea();
+    const favHome = fa && (filt.favOnly || fa.spanMi <= FAV_CLUSTER_MI);
+    if (!favHome) {
+      if (loc && free()) useMyLocation(); else if (loc) quietLocate();
+      return;
+    }
+    if (free()) fitTo(fa.bounds, FAV_MAX_ZOOM, homePadding() + 40);
+    if (!loc || !(await quietLocate()) || filt.favOnly || !free()) return;
+    const closest = Math.min(...fa.courts.map((c) => meters(ME.pos.lat, ME.pos.lon, c.lat, c.lon))) / MI;
+    if (closest > filt.radius) useMyLocation();   // away from your usual courts: show where you are
   }
 
   // ---------- live detail from Open-Meteo for the place on screen ----------
@@ -1768,14 +1876,18 @@
   // The whole forecast region (Malibu to Riverside, Newport Beach to the San Fernando Valley), with a margin.
   const HOME_BOUNDS = [[-118.72, 33.54], [-117.28, 34.33]];
   const homePadding = () => (innerWidth < 760 ? 12 : 30);
+  // The ⛶ button zooms out to everything the filter shows: your ★ courts, your radius, or the region.
   function goHome() {
-    map.fitBounds(HOME_BOUNDS, { padding: homePadding(), duration: 700 });
+    const mode = filterMode();
+    if (mode === "fav") fitTo(favArea().bounds, FAV_MAX_ZOOM, homePadding() + 40);
+    else if (mode === "near") fitTo(circleBounds(ME.pos, filt.radius));
+    else fitTo(HOME_BOUNDS, 22);
   }
   class HomeControl {
     onAdd() {
       this.el = document.createElement("div");
       this.el.className = "maplibregl-ctrl maplibregl-ctrl-group";
-      this.el.innerHTML = `<button type="button" class="home-btn" title="Show all courts" aria-label="Zoom out to show all courts">
+      this.el.innerHTML = `<button type="button" class="home-btn" title="Show all my courts" aria-label="Zoom out to show all the courts you've chosen to see">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8V3h5M17 8V3h-5M3 12v5h5M17 12v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
       this.el.querySelector("button").addEventListener("click", (e) => { e.stopPropagation(); goHome(); });
       return this.el;
@@ -1789,7 +1901,16 @@
     $("setUseloc").checked = !!ME.pos;
     $("setUseloc").disabled = !navigator.geolocation;
     $("setAutocheck").checked = autoCheckOn();
+    syncFilterControls();
     $("settings").showModal();
+  }
+  function syncFilterControls() {
+    $("setNear").checked = filt.near;
+    $("setNear").disabled = !navigator.geolocation;
+    $("setRadius").value = filt.radius;
+    $("radiusOut").textContent = `${filt.radius} mi`;
+    $("radiusRow").hidden = !filt.near;
+    $("setFavOnly").checked = filt.favOnly;
   }
 
   // ---------- wiring ----------
@@ -1804,6 +1925,32 @@
       render(); saveHash(); updateView();
     });
     $("settingsBtn").addEventListener("click", openSettings);
+    $("filterChip").addEventListener("click", openSettings);
+    // Which courts show. Changing a setting zooms to the courts it now shows.
+    $("setNear").addEventListener("change", (e) => {
+      filt.near = e.target.checked;
+      store.set("cc-near", filt.near ? "on" : "off");
+      syncFilterControls();
+      if (filt.near && !ME.pos) { useMyLocation(); return; }   // it starts once we know where you are
+      applyFilter(filt.near && filterMode() === "near");
+    });
+    $("setRadius").addEventListener("input", (e) => {   // while dragging: redraw the ring and courts
+      filt.radius = Number(e.target.value);
+      $("radiusOut").textContent = `${filt.radius} mi`;
+      applyFilter(false);
+    });
+    $("setRadius").addEventListener("change", () => {   // let go: remember it and fit the ring
+      store.set("cc-radius", String(filt.radius));
+      if (filterMode() === "near") goHome();
+    });
+    $("setFavOnly").addEventListener("change", (e) => {
+      filt.favOnly = e.target.checked;
+      store.set("cc-favonly", filt.favOnly ? "on" : "off");
+      if (filt.favOnly && !community.favorites.size) {
+        toast(community.user ? "No ★ courts yet. Tap ☆ on a court to add it." : "Sign in, then tap ☆ on a court to save it as a favorite.");
+      }
+      applyFilter(filterMode() !== "all");
+    });
     $("settings").addEventListener("click", (e) => {
       if (e.target === $("settings") || e.target.closest('[data-act="close"]')) $("settings").close();
     });
@@ -1864,6 +2011,7 @@
     map.on("mouseenter", "court-dots", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "court-dots", () => { map.getCanvas().style.cursor = ""; });
     map.on("moveend", () => { renderPins(); updateView(); });   // pins and the weather panel follow the map
+    map.on("movestart", (e) => { if (e.originalEvent) cameraTouched = true; });   // the player moved it: leave it be
     // Names appear once you're zoomed in (numbers are always on the courts).
     const names = () => map.getContainer().classList.toggle("show-names", map.getZoom() >= 12.5);
     map.on("zoom", names);
@@ -1915,7 +2063,7 @@
       render(true);
       if (state.selected) select(state.selected);
       initCommunity();   // reviews load after the map, so they never slow down the forecast
-      autoUseLocation(); // you allowed location before: show your local weather again
+      openHome();        // your ★ courts or your area, not all of SoCal
     });
   }
 

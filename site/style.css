@@ -88,6 +88,13 @@ button, input { font: inherit; }
 .toggle-switch:checked::after { transform: translateX(18px); }
 .toggle-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .toggle-switch:disabled { opacity: .45; cursor: default; }
+.setsect { margin: 16px 0 0; font-size: 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.setsect + .setrow { border-top: 0 !important; }
+/* the "how far" slider under "Only courts near me" */
+.setrange { display: flex; align-items: center; gap: 12px; padding: 0 0 12px; }
+.setrange[hidden] { display: none; }
+.setrange input { flex: 1; accent-color: var(--play); }
+.setrange output { min-width: 48px; text-align: right; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
 .acct button.wide {
   width: 100%; margin-top: 14px; border: 0; border-radius: 999px; padding: 10px; font-weight: 800;
   cursor: pointer; background: var(--page); color: var(--ink);
@@ -248,6 +255,13 @@ body { height: 100dvh; }
   display: inline-flex; align-items: center; gap: 6px;
 }
 .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+/* which courts are on the map ("Within 25 mi · 143 courts"); tap to change */
+.filter-chip {
+  border: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); border-radius: 999px;
+  padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
+}
+.filter-chip[hidden] { display: none; }
+.filter-chip .muted { font-weight: 700; }
 .ic { width: 15px; height: 15px; vertical-align: -2px; flex: none; }
 .ball-dot { width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f4ff8a, #c9e021 60%, #a9c010); display: inline-block; }
 .toggle {
