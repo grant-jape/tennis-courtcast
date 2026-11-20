@@ -1389,7 +1389,7 @@
       temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
       hourly: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,"
         + "weather_code,cloud_cover,visibility,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index,pressure_msl,is_day",
-      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max,sunrise,sunset,daylight_duration",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max,sunrise,sunset,daylight_duration,wind_gusts_10m_max",
     });
     const aq = new URLSearchParams({ ...common, forecast_days: "3", hourly: "us_aqi,pm2_5,ozone" });
     let data = prev && prev.data;
@@ -1551,137 +1551,261 @@
     }
   }
 
-  // ---------- detail tiles (Pixel Weather style) ----------
+  // ---------- detail tiles: what the weather means on court ----------
+  // Each "read" turns a reading into tennis terms:
+  //   head  a word for the tile ("Gusty", "Heavy", "Dewy")
+  //   play  what it does on court, and what to do about it
+  //   sev   how much it matters right now, 0..1 (the "How it plays" summary leads with the biggest)
+  //   adj   a word for the summary headline;  sum  a clause for the summary sentence;  tip  a short tip
+  // Thresholds follow the playability score (courtcast/config.py) wherever it has one.
   const UV_LEVEL = (u) => (u < 3 ? "Low" : u < 6 ? "Moderate" : u < 8 ? "High" : u < 11 ? "Very high" : "Extreme");
-  // US EPA air-quality bands, and what they mean for a couple of hours of tennis.
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const andJoin = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+  const feet = (m) => Math.max(1, Math.round(m * 3.281));
+
+  // How far a gust pushes the ball sideways: the drag simulation in courtcast/config.py
+  // (gust mph, serve toss m, lob m), interpolated in between and extended past 25 mph.
+  const DRIFT = [[0, 0, 0], [10, 0.2, 2.4], [15, 0.4, 3.7], [20, 0.7, 5.2], [25, 1.0, 6.8]];
+  function drift(g) {
+    let i = 1;
+    while (i < DRIFT.length - 1 && g > DRIFT[i][0]) i++;
+    const [g0, t0, l0] = DRIFT[i - 1], [g1, t1, l1] = DRIFT[i], f = (g - g0) / (g1 - g0);
+    return { toss: Math.max(0, t0 + (t1 - t0) * f), lob: Math.max(0, l0 + (l1 - l0) * f) };
+  }
+  function readWind(w, g) {
+    const B = DATA.bands, d = drift(g);
+    const push = `A gust moves your toss ~${feet(d.toss)} ft and a lob ~${feet(d.lob)} ft.`;
+    const uneven = g - w >= 8 ? " It comes and goes, so it's hard to adjust for." : "";
+    if (g < B.wind_iffy) return { band: "play", head: "Calm", sev: 0, play: "The ball goes where you aim it." };
+    if (g < 15) return { band: "iffy", head: "Light breeze", sev: 0.3, adj: "breezy", sum: "a breeze nudges tosses and lobs",
+      play: `${push} Toss a little lower.`, tip: "Lower toss" };
+    if (g < B.wind_skip) return { band: "iffy", head: "Gusty", sev: 0.65, adj: "gusty", sum: "gusts push tosses and lobs around",
+      play: `${push}${uneven} Lower your toss, add spin, and aim well inside the lines.`, tip: "Lower toss, aim inside the lines" };
+    return { band: "skip", head: "Too windy", sev: 1, adj: "very windy", sum: "the wind blows lobs and tosses way off",
+      play: `${push} Rallies turn into scrambles; most players call it here.`, tip: "Try another hour" };
+  }
+  // Ball pressure and rubber bounce change with temperature: cold balls are dead, hot ones fly.
+  function readBall(t, hu) {
+    const damp = hu != null && hu >= 85 ? " Damp air makes it a touch heavier." : "";
+    if (t < 50) return { head: "Heavy", sev: 0.55, adj: "cold", sum: "the ball feels heavy and bounces low",
+      play: `Cold balls feel dead and bounce low, and strings stiffen. Swing through it and warm up longer.${damp}`, tip: "Longer warm-up" };
+    if (t < 62) return { head: "A bit slow", sev: 0.2, adj: "cool", sum: "the ball plays a little slow",
+      play: `The ball sits down a little; you'll need more racquet-head speed.${damp}` };
+    if (t < 82) return { head: "Plays true", sev: 0, play: `Normal pace and bounce.${damp}` };
+    if (t < 92) return { head: "Lively", sev: 0.15, adj: "warm", sum: "the ball flies a little livelier",
+      play: "The ball jumps off the strings and bounces higher. A bit more topspin keeps it in." };
+    return { head: "Fast", sev: 0.3, adj: "hot", sum: "the ball flies fast and kicks up high",
+      play: "The ball flies and kicks up high, and balls lose pressure sooner. Open a fresh can.", tip: "Fresh balls, more topspin" };
+  }
+  function readHeat(f, sunny) {
+    const surface = sunny ? " Hard courts in full sun get much hotter than the air." : "";
+    if (f >= 95) return { head: "Heat risk", sev: 0.9, adj: "very hot", sum: "the heat is a real risk",
+      play: `Drink every changeover, use the shade and an ice towel, and stop if you feel dizzy.${surface}`, tip: "Drink every changeover" };
+    if (f >= 85) return { head: "Hot", sev: 0.45, adj: "hot", sum: "it's hot work out there",
+      play: `Drink every changeover and rest in the shade.${surface}`, tip: "Extra water" };
+    if (f >= 70) return { head: "Comfortable", sev: 0, play: "Easy on the body. Drink at changeovers." };
+    if (f >= 55) return { head: "Cool", sev: 0, play: "Great for long rallies. You'll still sweat, so keep drinking." };
+    return { head: "Cold", sev: 0.35, adj: "cold", sum: "it's cold on court",
+      play: "Wear layers you can peel off as you heat up. Cold muscles strain more easily, so ease into it.", tip: "Layers" };
+  }
+  // Dew point is what your skin feels (humidity alone depends on temperature). Near it, dew forms.
+  function readGrip(dp, hu, t, dewHours) {
+    if (dp != null && t != null && t - dp <= 4 && dewHours) return { head: "Dewy", sev: 0.45, adj: "dewy",
+      sum: "dew makes the court and lines slick", tip: "Watch your footing",
+      play: "The air is at its dew point, so courts and painted lines get slick, especially in the shade. Check your footing." };
+    if (dp != null && dp >= 65) return { head: "Muggy", sev: 0.45, adj: "muggy", sum: "sweat won't dry and grips get slick",
+      play: "Sweat won't dry and grips get slick. Bring a towel and a spare overgrip, and slow down between points.", tip: "Towel and spare overgrip" };
+    if (dp != null && dp >= 58) return { head: "Sticky", sev: 0.2, adj: "sticky", sum: "grips get damp",
+      play: "Your grip gets damp later in a set. Towel off at changeovers." };
+    if ((dp != null && dp < 35) || (hu != null && hu < 25)) return { head: "Dry", sev: t >= 75 ? 0.3 : 0.1, adj: "dry",
+      sum: "dry air dries you out fast", tip: "Drink before you're thirsty",
+      play: "Sweat dries instantly, so you lose water without noticing. Drink before you're thirsty." };
+    return { head: "Comfortable", sev: 0, play: "Your grip stays dry and sweat evaporates normally." };
+  }
+  // How many hours ago it last rained (1-3), looking back past the build's hours with live data.
+  function rainedAgo(rd, h) {
+    const i0 = rd.wx ? rd.wx.ix.get(DATA.times[h]) : undefined;
+    for (let k = 1; k <= 3; k++) {
+      let v = h - k >= 0 ? rd.at("r", h - k) : null;
+      if (v == null && i0 != null && i0 - k >= 0) v = rd.wx.f.hourly.precipitation[i0 - k];
+      if (v != null && v >= 0.01) return k;
+    }
+    return 0;
+  }
+  function readCourt(rd, h) {
+    const r = rd.at("r", h) || 0;
+    if (r >= 0.01) return { band: "skip", head: "Raining", sev: 1, adj: "rainy", sum: "it's raining",
+      play: "Courts are wet and slippery. Wait it out." };
+    const ago = rainedAgo(rd, h);
+    if (ago === 1) return { band: "skip", head: "Wet", sev: 0.9, adj: "wet", sum: "the court is still wet", tip: "Bring a squeegee or towel",
+      play: "It rained in the last hour, so courts and lines are slippery. Give them time, or bring a squeegee." };
+    if (ago) return { band: "iffy", head: "Drying", sev: 0.5, adj: "damp", sum: "the court is still drying",
+      play: `It rained about ${ago} hours ago. Watch for puddles and slick lines in the shade.` };
+    if (r > 0) return { band: "iffy", head: "Drizzle", sev: 0.7, adj: "drizzly", sum: "drizzle makes the lines slick",
+      play: "A light drizzle: playable, but painted lines get slick fast." };
+    let next = null;
+    for (let i = h + 1; i <= Math.min(DATA.times.length - 1, h + 6); i++) {
+      if ((rd.at("r", i) || 0) >= 0.01 || (rd.at("p", i) || 0) >= 50) { next = i; break; }
+    }
+    if (next != null) {
+      const at = fmtTime(DATA.times[next], true), soon = next - h <= 2;
+      return { band: "iffy", head: "Dry for now", sev: soon ? 0.5 : 0.25, adj: soon ? "rain on the way" : "", sum: `rain is likely by ${at}`,
+        play: `Rain is likely around ${fmtTime(DATA.times[next])}. Play before then.`, tip: `Play before ${at}` };
+    }
+    return { band: "play", head: "Dry", sev: 0, play: "No rain on the way. Good footing." };
+  }
+  // US EPA air-quality bands, and how hard to play in them.
   const AQI_BANDS = [
-    [50, "Good", "#2fb344", "Great air for playing"],
-    [100, "Moderate", "#e6c229", "Fine for most players"],
-    [150, "Unhealthy for sensitive groups", "#f08a24", "Asthma or allergies? Take more breaks"],
-    [200, "Unhealthy", "#e5484d", "Consider shorter, easier sessions"],
-    [300, "Very unhealthy", "#a3262a", "Better to skip today"],
-    [Infinity, "Hazardous", "#6e1b1b", "Stay indoors"],
+    [50, "Good", "#2fb344", 0, "Full intensity. Go for it."],
+    [100, "Moderate", "#e6c229", 0.1, "Fine for most players. Asthma or allergies? Take it a little easier."],
+    [150, "Unhealthy for sensitive groups", "#f08a24", 0.5, "Sensitive players: rally instead of playing a match, take more breaks, keep an inhaler handy."],
+    [200, "Unhealthy", "#e5484d", 0.8, "Keep it short and light. Skip the hard sprints."],
+    [300, "Very unhealthy", "#a3262a", 0.95, "Better to skip today."],
+    [Infinity, "Hazardous", "#6e1b1b", 1, "Stay indoors."],
   ];
   const aqiBand = (v) => AQI_BANDS.find(([max]) => v <= max);
+  function readAir(aqi) {
+    const [, label, color, sev, play] = aqiBand(aqi);
+    return { head: label === "Unhealthy for sensitive groups" ? "Sensitive groups" : label, color, sev, play,
+      adj: sev >= 0.5 ? "smoky" : "", sum: "the air is bad for hard breathing", tip: sev >= 0.5 ? "Play lighter" : undefined };
+  }
+  function readSun(uv, rd, h) {
+    const sun = sunTimes(DATA.times[h].slice(0, 10), rd);
+    const at = Number(DATA.times[h].slice(11, 13)) + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
+    if (!DATA.is_day[h]) return { dark: true, head: "Dark", sev: 0.7, adj: "dark", sum: "it's dark, so lit courts only", tip: "Find a lit court",
+      play: sun && at < hoursOf(sun.rise) ? `Before sunrise (${clock(sun.rise)}): lit courts only.` : "After sunset: lit courts only." };
+    const uvTxt = uv == null ? "" : uv >= 6 ? "Strong sun: sweat-proof sunscreen, reapplied every hour, and a hat or visor."
+      : uv >= 3 ? "Sunscreen, and a visor helps on bright tosses." : "Gentle sun.";
+    if (sun && (Math.abs(at - hoursOf(sun.rise)) <= 1.5 || Math.abs(hoursOf(sun.set) - at) <= 1.5)) {
+      return { head: "Low sun", sev: 0.25, adj: "low sun", sum: "low sun glares into one end", tip: "Sunglasses or a visor",
+        play: `The sun is low, so one end serves and hits overheads into the glare. Sunglasses or a visor help; switching ends evens it out. ${uvTxt}` };
+    }
+    return { head: uv == null ? "Daylight" : `${UV_LEVEL(uv)} UV`, sev: uv >= 8 ? 0.2 : 0, adj: uv >= 8 ? "sun-baked" : "",
+      sum: "the sun is strong", play: uvTxt || "Daylight.", tip: uv >= 6 ? "Sunscreen and a hat" : undefined };
+  }
+  // The 10-day list: one tennis word per day (daily max gusts, rain and highs).
+  function dayTag(D, i) {
+    const pp = D.precipitation_probability_max[i] || 0, rain = D.precipitation_sum[i] || 0;
+    const g = D.wind_gusts_10m_max ? D.wind_gusts_10m_max[i] : null, hi = D.temperature_2m_max[i];
+    if (rain >= 0.1 || pp >= 60) return ["skip", "Rain"];
+    if (g != null && g >= DATA.bands.wind_skip) return ["skip", "Windy"];
+    if (hi >= 95) return ["iffy", "Hot"];
+    if (g != null && g >= 15) return ["iffy", "Breezy"];
+    if (hi < 55) return ["iffy", "Cold"];
+    return ["play", "Good"];
+  }
 
-  const tile = (cls, icon, title, big, note, extra = "") =>
-    `<div class="tile ${cls}"><div class="tile-h">${icon}<span>${title}</span></div><div class="tile-big">${big}</div>${note ? `<div class="tile-note">${note}</div>` : ""}${extra}</div>`;
+  // A tile: header, a tennis word, the numbers behind it, then what it means on court.
+  const tile = (cls, icon, title, head, meas, play, extra = "") =>
+    `<div class="tile ${cls}"><div class="tile-h">${icon}<span>${title}</span></div>
+      <div class="tile-word">${head}</div>${meas ? `<div class="tile-meas">${meas}</div>` : ""}
+      ${play ? `<div class="tile-note">${play}</div>` : ""}${extra}</div>`;
   const TI = {   // tile header icons (simple line icons; colour comes from CSS)
-    star: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l1.9 4 4.3.5-3.2 3 .9 4.3L8 11.3 4.1 13.4l.9-4.3-3.2-3 4.3-.5z" fill="currentColor"/></svg>',
     cal: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     leaf: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13c0-6 4-10 11-10 0 7-4 11-10 11M3 13l5-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
     sun: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    ball: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.2 4.2c2.6 1.6 2.6 6 0 7.6M12.8 4.2c-2.6 1.6-2.6 6 0 7.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',
+    court: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3.5" width="13" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 3.5v9M4.5 3.5v9M11.5 3.5v9M4.5 8h7" stroke="currentColor" stroke-width="1.1"/></svg>',
     drop: ICON.rain, wind: ICON.wind, temp: ICON.temp,
-    eye: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>',
-    gauge: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.3 12a6.5 6.5 0 1 1 11.4 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 9l3-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     rise: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12a5 5 0 0 1 10 0M1 14h14M8 2v4M6 4l2-2 2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   };
 
   function renderTiles() {
-    const pl = place(), rd = reader(pl), h = state.hour, wx = rd.wx;
-    const out = [];
+    const pl = place(), rd = reader(pl), h = state.hour, wx = rd.wx, out = [];
+    const t = round(rd.at("t", h)), f = round(rd.at("ft", h)), hu = round(rd.at("hu", h)), dp = round(rd.at("dp", h));
+    const w = round(rd.at("w", h)) || 0, g = round(rd.at("g", h)) || 0, dir = rd.at("d", h) || 0;
+    const uv = rd.at("uv", h), aqi = rd.at("aqi", h), vis = rd.at("vis", h), hr = Number(DATA.times[h].slice(11, 13));
+    const cond = condition(rd.at("wc", h), DATA.is_day[h], rd.at("p", h), rd.at("r", h));
 
-    // 1. 10-day forecast: icon, rain chance, and each day's low-high range on a shared scale.
+    const wind = readWind(w, g), court = readCourt(rd, h);
+    const ball = t != null ? readBall(t, hu) : null;
+    const heat = f != null ? readHeat(f, DATA.is_day[h] && ["clear", "partly"].includes(cond.kind)) : null;
+    const grip = hu != null || dp != null ? readGrip(dp, hu, t, !DATA.is_day[h] || hr < 9) : null;
+    const air = aqi != null ? readAir(aqi) : null;
+    const sun = readSun(uv, rd, h);
+    const fog = vis != null && vis < 1609 ? { sev: 0.5, adj: "foggy", sum: "fog makes high balls hard to track", tip: "Keep the lobs low" } : null;
+
+    // 1. How it plays: the biggest issues right now, in a headline, a sentence and a few tips.
+    const issues = [court, wind, heat, ball, grip, air, sun, fog].filter((x) => x && x.sev > 0).sort((a, b) => b.sev - a.sev);
+    const adjs = [...new Set(issues.map((x) => x.adj).filter(Boolean))].slice(0, 2);
+    const sums = [...new Set(issues.map((x) => x.sum).filter(Boolean))].slice(0, 3);
+    const tips = [...new Set(issues.map((x) => x.tip).filter(Boolean))].slice(0, 3);
+    const closed = pl.kind === "court" && pl.court.eff === "closed", band = closed ? "skip" : pl.src.b[h];
+    const when = h === state.base ? "now" : `at ${fmtTime(DATA.times[h], true)}`;
+    out.push(`<div class="tile wide howplays ${band}"><div class="tile-h">${TI.ball}<span>How it plays ${when}</span></div>
+      <div class="tile-word">${closed ? "Court not playable" : adjs.length ? cap(adjs.join(" and ")) : "Ideal conditions"}</div>
+      <div class="tile-note">${closed ? esc(pl.court.effNote || "This court is marked not playable.")
+        : sums.length ? `${cap(andJoin(sums))}.` : "Calm, comfortable and dry: the ball plays true. Just go hit."}</div>
+      ${!closed && tips.length ? `<div class="tips">${tips.map((x) => `<span>${x}</span>`).join("")}</div>` : ""}</div>`);
+
+    // 2. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
+    out.push(tile(`wide wind ${wind.band}`, TI.wind, "Wind on court", wind.head, `${w} mph · gusts ${g} · from ${compass(dir)}`, wind.play,
+      `<svg class="compass" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="2"/>
+        ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
+        <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
+
+    // 3. Court & rain: is the court dry, and when does rain come? Bars = chance of rain each hour.
+    const n = Math.min(24, DATA.times.length - h);
+    let total = 0;
+    const bars = Array.from({ length: n }, (_, k) => {
+      const i = h + k, p = rd.at("p", i) || 0, r = rd.at("r", i) || 0;
+      total += r;
+      return `<i style="height:${Math.max(4, p)}%" class="${r >= 0.01 ? "wet" : ""}" title="${fmtTime(DATA.times[i])}: ${round(p)}%"></i>`;
+    }).join("");
+    out.push(tile(`wide precip court-${court.band}`, TI.court, "Court & rain", court.head,
+      `${round(rd.at("p", h)) || 0}% chance now · ${total >= 0.005 ? total.toFixed(2) : "0"}″ in the next ${n} h`, court.play,
+      `<div class="pbars">${bars}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>Chance of rain each hour</span><span>+${n}h</span></div>`));
+
+    // 4-9. Ball, heat, grip, air, sun, daylight.
+    if (ball) out.push(tile("ballt", TI.ball, "Ball &amp; bounce", ball.head, `${t}° air`, ball.play));
+    if (heat) out.push(tile("heat", TI.temp, "Heat &amp; body", heat.head, `Feels like ${f}°`, heat.play));
+    if (grip) out.push(tile("grip", TI.drop, "Grip &amp; sweat", grip.head,
+      [hu != null ? `${hu}% humidity` : "", dp != null ? `dew point ${dp}°` : ""].filter(Boolean).join(" · "), grip.play));
+    if (air) {
+      const pm = rd.at("pm25", h);
+      out.push(tile("aqi", TI.leaf, "Air quality", `<span style="color:${air.color}">●</span> ${air.head}`,
+        `AQI ${round(aqi)}${pm != null ? ` · PM2.5 ${round(pm)}` : ""}`, air.play,
+        `<div class="aqbar"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
+    } else out.push(tile("aqi", TI.leaf, "Air quality", "—", "", wx ? "Not available here." : "Loading…"));
+    // In the dark, the Daylight tile says it all: skip Sun & glare and let Daylight go full width.
+    if (!sun.dark) out.push(tile("suntile", TI.sun, "Sun &amp; glare", sun.head, uv != null ? `UV ${Math.round(uv)}` : "", sun.play));
+
+    const st = sunTimes(DATA.times[h].slice(0, 10), rd);
+    if (st) {
+      const r0 = hoursOf(st.rise), s0 = hoursOf(st.set), now = hr + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
+      const frac = Math.max(0, Math.min(1, (now - r0) / (s0 - r0)));
+      const x = 10 + frac * 180, y = 70 - Math.sin(frac * Math.PI) * 55, left = s0 - now;
+      let head, play;
+      if (now < r0) { head = "Before sunrise"; play = `Light from ${clock(st.rise)}. Until then, lit courts only.`; }
+      else if (left <= 0) { head = "After dark"; play = "Lit courts only."; }
+      else {
+        const hh = Math.floor(left), mm = Math.round((left - hh) * 60);
+        head = hh ? `${hh} h ${mm} m left` : `${mm} min left`;
+        play = left < 1 ? "Time for a quick hit, then lit courts only." : left < 1.75 ? "About a set's worth of light." : "Plenty of light for a match.";
+      }
+      out.push(tile(`sunt${sun.dark ? " wide" : ""}`, TI.rise, "Daylight", head, `Sunrise ${clock(st.rise)} · sunset ${clock(st.set)}`, play,
+        `<svg class="arc" viewBox="0 0 200 80" aria-hidden="true">
+          <path d="M10 70 Q100 -40 190 70" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4"/>
+          <path d="M0 70h200" stroke="var(--line)" stroke-width="1.5"/>
+          ${DATA.is_day[h] ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#ffc531"/>` : ""}</svg>`));
+    }
+
+    // 10. 10-day forecast: a tennis word per day, rain chance, and each day's low-high range on a shared scale.
     if (wx && wx.f.daily) {
       const D = wx.f.daily, lo = Math.min(...D.temperature_2m_min), hi = Math.max(...D.temperature_2m_max), span = Math.max(1, hi - lo);
       const today = pacificHourStamp().slice(0, 10);
       const rows = D.time.map((d, i) => {
         const c = condition(D.weather_code[i], 1, D.precipitation_probability_max[i], (D.precipitation_sum[i] || 0) / 6);
         const a = ((D.temperature_2m_min[i] - lo) / span) * 100, b = ((D.temperature_2m_max[i] - lo) / span) * 100;
-        const pp = D.precipitation_probability_max[i];
-        return `<li${d === today ? ' class="today"' : ""}><span class="dd">${d === today ? "Today" : dayWord(d)}</span>
+        const pp = D.precipitation_probability_max[i], [tb, tw] = dayTag(D, i);
+        return `<li${d === today ? ' class="today"' : ""}><span class="dd">${d === today ? "Today" : dayWord(d)}<small class="tag ${tb}">${tw}</small></span>
           ${wxIcon(c.kind, true)}<span class="dp">${pp >= 20 ? `${pp}%` : ""}</span>
           <span class="dlo">${round(D.temperature_2m_min[i])}°</span>
           <span class="drange"><i style="left:${a.toFixed(1)}%;right:${(100 - b).toFixed(1)}%"></i></span>
           <span class="dhi">${round(D.temperature_2m_max[i])}°</span></li>`;
       }).join("");
-      out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><ul class="ten">${rows}</ul></div>`);
-    } else out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day forecast</span></div><div class="tile-note">Loading…</div></div>`);
-
-    // 2. Precipitation: chance for each of the next 24 hours, total expected, and the next likely rain.
-    const n = Math.min(24, DATA.times.length - h);
-    let total = 0, next = null;
-    const bars = Array.from({ length: n }, (_, k) => {
-      const i = h + k, p = rd.at("p", i) || 0, r = rd.at("r", i) || 0;
-      total += r;
-      if (next == null && (r >= 0.01 || p >= 50)) next = i;
-      return `<i style="height:${Math.max(4, p)}%" class="${r >= 0.01 ? "wet" : ""}" title="${fmtTime(DATA.times[i])}: ${round(p)}%"></i>`;
-    }).join("");
-    out.push(tile("wide precip", TI.drop, "Precipitation",
-      `${total >= 0.005 ? total.toFixed(2) : "0"}<small>″ next ${n} h</small>`,
-      next === h ? "Rain likely now" : next != null ? `Rain likely ${fmtTime(DATA.times[next])}` : "No rain expected",
-      `<div class="pbars">${bars}</div><div class="mini-ends"><span>${fmtTime(DATA.times[h], true)}</span><span>Chance of rain each hour</span><span>+${n}h</span></div>`));
-
-    // 3. Wind, with a compass. Direction is where it blows FROM; the arrow shows where it's going.
-    const w = round(rd.at("w", h)), g = round(rd.at("g", h)), dir = rd.at("d", h) || 0;
-    const wb = g >= DATA.bands.wind_skip ? "skip" : g >= DATA.bands.wind_iffy ? "iffy" : "play";
-    out.push(tile(`wind ${wb}`, TI.wind, "Wind", `${w}<small> mph</small>`, `Gusts ${g} mph<br>From ${compass(dir)}`,
-      `<svg class="compass" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--line)" stroke-width="2"/>
-        ${["N", "E", "S", "W"].map((c, k) => `<text x="${32 + Math.sin(k * Math.PI / 2) * 21}" y="${32 - Math.cos(k * Math.PI / 2) * 21 + 3.5}" text-anchor="middle">${c}</text>`).join("")}
-        <g transform="rotate(${(dir + 180) % 360} 32 32)"><path d="M32 13l6 10h-4v22h-4V23h-4z" fill="var(--wind-c)"/></g></svg>`));
-
-    // 4. Air quality (US AQI)
-    const aqi = rd.at("aqi", h);
-    if (aqi != null) {
-      const [, label, color, note] = aqiBand(aqi), pm = rd.at("pm25", h);
-      out.push(tile("aqi", TI.leaf, "Air quality", `${round(aqi)}`, `<b style="color:${color}">${label}</b><br>${note}${pm != null ? ` · PM2.5 ${round(pm)}` : ""}`,
-        `<div class="aqbar"><i style="left:${Math.min(100, (aqi / 300) * 100)}%"></i></div>`));
-    } else out.push(tile("aqi", TI.leaf, "Air quality", "—", wx ? "Not available here" : "Loading…"));
-
-    // 5. UV
-    const uv = rd.at("uv", h);
-    if (uv != null) {
-      const di = wx && wx.f.daily ? wx.f.daily.time.indexOf(DATA.times[h].slice(0, 10)) : -1;
-      const peak = di >= 0 ? wx.f.daily.uv_index_max[di] : null;
-      out.push(tile("uv", TI.sun, "UV index", `${Math.round(uv)}`, `${UV_LEVEL(uv)}${uv >= 3 ? " · Sunscreen and a hat" : ""}${peak != null ? `<br>Today's peak ${Math.round(peak)}` : ""}`,
-        `<div class="uvbar"><i style="left:${Math.min(100, (uv / 11) * 100)}%"></i></div>`));
-    }
-
-    // 6. Humidity + dew point
-    const hu = round(rd.at("hu", h)), dp = round(rd.at("dp", h)), t = round(rd.at("t", h));
-    if (hu != null) out.push(tile("humid", TI.drop, "Humidity", `${hu}<small>%</small>`,
-      `${dp != null ? `Dew point ${dp}°<br>` : ""}${hu < 25 ? "Very dry. Bring extra water." : hu > 70 && t >= 75 ? "Muggy. Pace yourself." : hu > 80 ? "Damp air. Balls play slower." : "Comfortable"}`));
-
-    // 7. Feels like
-    const ft = round(rd.at("ft", h));
-    if (ft != null) out.push(tile("feels", TI.temp, "Feels like", `${ft}°`,
-      Math.abs(ft - t) < 3 ? "Close to the actual temperature" : ft < t ? "Wind makes it feel cooler" : "Humidity makes it feel warmer"));
-
-    // 8. Visibility
-    const vis = rd.at("vis", h);
-    if (vis != null) {
-      const mi = vis / 1609;
-      out.push(tile("vis", TI.eye, "Visibility", mi >= 10 ? "10+<small> mi</small>" : `${mi.toFixed(mi < 3 ? 1 : 0)}<small> mi</small>`,
-        mi >= 10 ? "Perfectly clear" : mi >= 5 ? "Light haze" : mi >= 1 ? "Hazy" : "Fog. Hard to track the ball."));
-    }
-
-    // 9. Pressure, and which way it's heading (falling pressure often means weather is on the way).
-    const pr = rd.at("pr", h);
-    if (pr != null) {
-      const earlier = rd.time("pr", DATA.times[h].slice(0, 11) + String(Math.max(0, Number(DATA.times[h].slice(11, 13)) - 3)).padStart(2, "0") + ":00");
-      const dlt = earlier != null ? pr - earlier : 0;
-      out.push(tile("press", TI.gauge, "Pressure", `${(pr * 0.02953).toFixed(2)}<small> inHg</small>`,
-        Math.abs(dlt) < 0.7 ? "Steady" : dlt > 0 ? "↑ Rising: settled weather" : "↓ Falling: weather may change"));
-    }
-
-    // 10. Sunrise & sunset, with the sun's place along today's arc.
-    const sun = sunTimes(DATA.times[h].slice(0, 10), rd);
-    if (sun) {
-      const r0 = hoursOf(sun.rise), s0 = hoursOf(sun.set), now = Number(DATA.times[h].slice(11, 13)) + (h === state.base ? new Date().getMinutes() / 60 : 0.5);
-      const f = Math.max(0, Math.min(1, (now - r0) / (s0 - r0)));
-      const x = 10 + f * 180, y = 70 - Math.sin(f * Math.PI) * 55;
-      const len = sun.len ? `${Math.floor(sun.len / 3600)} h ${Math.round((sun.len % 3600) / 60)} m of daylight` : "";
-      out.push(`<div class="tile wide sunt"><div class="tile-h">${TI.rise}<span>Sunrise &amp; sunset</span></div>
-        <svg class="arc" viewBox="0 0 200 80" aria-hidden="true">
-          <path d="M10 70 Q100 -40 190 70" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 4"/>
-          <path d="M0 70h200" stroke="var(--line)" stroke-width="1.5"/>
-          ${DATA.is_day[h] ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#ffc531"/>` : ""}
-        </svg>
-        <div class="sunrow"><div><span class="tile-note">Sunrise</span><b>${clock(sun.rise)}</b></div>
-          <div class="mid tile-note">${len}</div>
-          <div><span class="tile-note">Sunset</span><b>${clock(sun.set)}</b></div></div>
-        <div class="tile-note">After sunset, lit courts only.</div></div>`);
-    }
+      out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day tennis outlook</span></div><ul class="ten">${rows}</ul></div>`);
+    } else out.push(`<div class="tile wide days"><div class="tile-h">${TI.cal}<span>10-day tennis outlook</span></div><div class="tile-note">Loading…</div></div>`);
 
     $("tiles").innerHTML = out.join("");
   }
