@@ -25,8 +25,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_courts(path=ROOT / "courts.csv"):
+    """Courts to forecast. Rows with status "removed" (no courts there after all) are left out;
+    they stay in courts.csv so scripts/build_courts.py doesn't add them back from OpenStreetMap."""
     with open(path, newline="", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+        rows = [r for r in csv.DictReader(f) if (r.get("status") or "").strip() != "removed"]
     for r in rows:
         r["lat"], r["lon"] = float(r["lat"]), float(r["lon"])
     return rows
@@ -193,6 +195,7 @@ def main(argv=None):
         data["cells"].append({"lat": la, "lon": lo, **series(res, start, hours), "wc": details(res, start, hours)["wc"]})
     for c, k in zip(courts, cell_of):
         # status: "" (fine) / "poor" (playable but rough) / "closed" (not playable); note explains why.
+        # ("removed" rows never get here: load_courts leaves them out.)
         data["courts"].append({**{key: c.get(key) or "" for key in ("id", "name", "city", "type", "status", "note")},
                                "lat": c["lat"], "lon": c["lon"],
                                # how many courts the site has (feeds the "likely busy" guess)

@@ -1,6 +1,8 @@
+import tempfile
 import unittest
+from pathlib import Path
 
-from courtcast.build import daily, details
+from courtcast.build import daily, details, load_courts
 
 
 class TestDetails(unittest.TestCase):
@@ -47,3 +49,22 @@ class TestCellsAndGrid(unittest.TestCase):
         self.assertEqual(len(all_pts), meta["nlat"] * meta["nlon"])
         self.assertTrue(0 < len(near) < 12)                       # a handful around the one court
         self.assertTrue(all(0 <= i < meta["nlat"] and 0 <= j < meta["nlon"] for i, j in ij))
+
+
+class TestLoadCourts(unittest.TestCase):
+    def test_removed_rows_are_left_out(self):
+        csv_text = "\n".join([
+            "id,name,city,type,lat,lon,status,note,courts",
+            "a,A Park,X,park,34.1,-117.5,,,2",
+            "b,B Park,X,park,34.2,-117.6,closed,Locked,2",
+            "c,C Park,X,park,34.3,-117.7,removed,No courts here,1",
+        ]) + "\n"
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "courts.csv"
+            p.write_text(csv_text, encoding="utf-8")
+            rows = load_courts(p)
+        self.assertEqual([r["id"] for r in rows], ["a", "b"])   # closed stays (gray ✕); removed is gone
+        self.assertEqual(rows[0]["lat"], 34.1)
+
+    def test_real_list_has_no_removed_courts(self):
+        self.assertNotIn("fontana-park-fontana", {r["id"] for r in load_courts()})

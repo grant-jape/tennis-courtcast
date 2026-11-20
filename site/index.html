@@ -60,6 +60,7 @@
           <button data-layer="wind" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 6h8.2a2.2 2.2 0 1 0-2.1-2.9M1.5 10h11a2 2 0 1 1-1.9 2.6M1.5 8h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Wind</button>
           <button data-layer="rain" aria-pressed="false"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8C8 1.8 3.5 7 3.5 10a4.5 4.5 0 0 0 9 0C12.5 7 8 1.8 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg> Rain</button>
         </div>
+        <button id="filterChip" class="filter-chip" type="button" hidden></button>
         <div class="legend" id="legend"></div>
       </div>
       <button id="locateBtn" class="locate" aria-label="At a court? Check in" title="At a court? Check in" hidden><span aria-hidden="true">📍</span><span class="ltxt"> At a court?</span></button>
@@ -73,6 +74,18 @@
     <button class="x" data-act="close" aria-label="Close">×</button>
     <div class="setbody">
       <h2>Settings</h2>
+      <h3 class="setsect">Courts on the map</h3>
+      <label class="setrow"><span><b>Only courts near me</b><span class="muted small">Hide courts farther than this from you. Your ★ courts always show.</span></span>
+        <input type="checkbox" id="setNear" class="toggle-switch"></label>
+      <div class="setrange" id="radiusRow">
+        <input type="range" id="setRadius" min="10" max="50" step="5" aria-label="How far to show courts, in miles">
+        <output id="radiusOut" for="setRadius">25 mi</output>
+      </div>
+      <label class="setrow"><span><b>Only my ★ courts</b><span class="muted small">Just your favorites. Tap ☆ on a court to add it.</span></span>
+        <input type="checkbox" id="setFavOnly" class="toggle-switch"></label>
+      <div class="setrow"><span><b>Hidden courts</b><span class="muted small" id="hiddenCount">None. Hide a court from its card.</span></span>
+        <button type="button" id="unhideAll" class="pill-btn" hidden>Unhide all</button></div>
+      <h3 class="setsect">More</h3>
       <label class="setrow"><span><b>Show school courts</b><span class="muted small">Public access to school courts varies.</span></span>
         <input type="checkbox" id="schools" class="toggle-switch"></label>
       <label class="setrow"><span><b>Use my location</b><span class="muted small">Your local weather and the best court near you. Rounded to about 1 km.</span></span>
