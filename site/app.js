@@ -962,9 +962,9 @@
   }
 
   // ---------- court markers ----------
-  // Hundreds of courts: zoomed out, each court is a coloured dot drawn by the map itself (fast,
-  // and tappable); from PIN_ZOOM in, the full court pins with scores appear for courts on screen.
-  const PIN_ZOOM = 12;
+  // Every court on screen is a court pin with its score, at every zoom (never a plain dot). Where
+  // pins overlap, the most notable (best score for the view) sits on top. Only courts on screen
+  // (plus a margin) are added to the map, so panning stays smooth.
   function buildMarkers() {
     DATA.courts.forEach((ct) => {
       const el = document.createElement("div");
@@ -978,27 +978,8 @@
     map.addSource("near-ring", { type: "geojson", data: ringFeature() });
     map.addLayer({ id: "near-ring", type: "line", source: "near-ring",
       paint: { "line-color": css("--accent"), "line-width": 2, "line-opacity": 0.55, "line-dasharray": [2, 2] } });
-    map.addSource("court-dots", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-    map.addLayer({
-      id: "court-dots", type: "circle", source: "court-dots", maxzoom: PIN_ZOOM,
-      paint: {
-        "circle-color": ["get", "color"],
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3.5, 11, 6.5],
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1, 11, 2],
-      },
-    });
   }
   const bandAt = (ct, h) => (ct.eff === "closed" ? "closed" : state.layer === "wind" && ct.wb ? ct.wb[h] : ct.b[h]);
-  function renderDots() {
-    const src = map.getSource("court-dots"), h = state.hour;
-    if (!src) return;
-    const mode = filterMode();
-    src.setData({ type: "FeatureCollection", features: markers
-      .filter(({ ct }) => visible(ct, mode))
-      .map(({ ct }) => ({ type: "Feature", geometry: { type: "Point", coordinates: [ct.lon, ct.lat] },
-        properties: { id: ct.id, color: PAL[bandAt(ct, h)] } })) });
-  }
 
   // The label under each court: score, gusts, or rain (amount if any, else chance).
   function chipValue(ct, h) {
@@ -1019,16 +1000,16 @@
     return school + ct.s[h] * 10;
   }
 
-  function renderMarkers() { renderDots(); renderPins(); renderRing(); renderFilter(); }
+  function renderMarkers() { renderPins(); renderRing(); renderFilter(); }
   function renderRing() { const src = map.getSource("near-ring"); if (src) src.setData(ringFeature()); }
   function renderPins() {
-    const h = state.hour, pins = map.getZoom() >= PIN_ZOOM, mode = filterMode();
+    const h = state.hour, mode = filterMode();
     const bb = map.getBounds(), dLat = (bb.getNorth() - bb.getSouth()) * 0.2, dLon = (bb.getEast() - bb.getWest()) * 0.2;
     markers.forEach((mk) => {
       const { ct, el, m } = mk;
       const inView = ct.lat > bb.getSouth() - dLat && ct.lat < bb.getNorth() + dLat
         && ct.lon > bb.getWest() - dLon && ct.lon < bb.getEast() + dLon;
-      const show = visible(ct, mode) && (ct.id === state.selected || (pins && inView));
+      const show = visible(ct, mode) && (ct.id === state.selected || inView);
       if (!show) { if (mk.shown) { m.remove(); mk.shown = false; } return; }
       // Wind view colours courts by wind alone; other views use the overall score.
       // A closed court is gray with a ✕ whatever the weather.
@@ -2000,16 +1981,7 @@
     const pick = (e) => { const li = e.target.closest("li"); if (li) { select(li.dataset.id); saveHash(); } };
     $("favList").addEventListener("click", pick);
     $("favList").addEventListener("keydown", (e) => { if (e.key === "Enter") pick(e); });
-    map.on("click", "court-dots", (e) => {
-      const f = e.features && e.features[0];
-      if (f) { select(f.properties.id); saveHash(); }
-    });
-    map.on("click", (e) => {
-      if (map.getLayer("court-dots") && map.queryRenderedFeatures(e.point, { layers: ["court-dots"] }).length) return;
-      if (state.selected) closeCard();
-    });
-    map.on("mouseenter", "court-dots", () => { map.getCanvas().style.cursor = "pointer"; });
-    map.on("mouseleave", "court-dots", () => { map.getCanvas().style.cursor = ""; });
+    map.on("click", () => { if (state.selected) closeCard(); });   // tap the map (not a court) to close the card
     map.on("moveend", () => { renderPins(); updateView(); });   // pins and the weather panel follow the map
     map.on("movestart", (e) => { if (e.originalEvent) cameraTouched = true; });   // the player moved it: leave it be
     // Names appear once you're zoomed in (numbers are always on the courts).
