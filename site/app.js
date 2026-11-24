@@ -1407,17 +1407,13 @@
     const renamed = !lastNamed || meters(lastNamed.lat, lastNamed.lon, pos.lat, pos.lon) > 1500;
     if (renamed) {
       const guess = nearestCourts(latitude, longitude, 1)[0];
-      ME.name = guess ? guess.c.city : "Your location";   // instant guess, replaced by the real place name below
+      // Your area is named after the city of your nearest court. No lookup service: your position
+      // never leaves the phone for this (it used to go to a reverse-geocoding API).
+      ME.name = guess ? guess.c.city : "Your location";
       lastNamed = pos;
     }
     renderMarkers();   // "near me" moves with you
     renderPanel();
-    if (!renamed) return;
-    try {
-      const j = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lon}&localityLanguage=en`)).json();
-      const name = j.locality || j.city;
-      if (name) { ME.name = name; renderHero(); }
-    } catch (_) { /* keep the guess */ }
   }
   function stopUsingLocation() {
     store.set("cc-useloc", "off");
