@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
+  <!-- Apply the saved text size before anything is drawn, so big text never flashes small. -->
+  <script>try { var cct = localStorage.getItem("cc-text"); if (cct === "lg" || cct === "xl") document.documentElement.dataset.text = cct; } catch (e) {}</script>
   <!-- Google Tag Manager (analytics). The GA4 tags live in the GTM container, not here.
        site_env keeps staging/local tests apart from real visits. -->
   <script>
@@ -40,6 +42,9 @@
          interleave with the map (see the CSS "order" rules). -->
     <aside class="panel">
       <section id="hero" class="hero" aria-live="polite"></section>
+
+      <!-- "For you": a greeting and your next good time to play, from the welcome setup. -->
+      <section id="forYou" class="foryou" hidden></section>
 
       <section class="hourly-wrap">
         <div class="sect-title">Hourly forecast <span class="muted">· tap an hour</span></div>
@@ -82,6 +87,15 @@
     <button class="x" data-act="close" aria-label="Close">×</button>
     <div class="setbody">
       <h2>Settings</h2>
+      <h3 class="setsect">Display</h3>
+      <div class="setrow col"><span><b>Text size</b><span class="muted small">Bigger text everywhere, including the map.</span></span>
+        <div class="seg textsize" role="group" aria-label="Text size">
+          <button type="button" data-text="md" aria-pressed="true">Standard</button>
+          <button type="button" data-text="lg" aria-pressed="false">Large</button>
+          <button type="button" data-text="xl" aria-pressed="false">Extra large</button>
+        </div></div>
+      <div class="setrow"><span><b>Personalize</b><span class="muted small">Your name, courts, and when and how you like to play.</span></span>
+        <button type="button" id="rerunWelcome" class="pill-btn">Set up</button></div>
       <h3 class="setsect">Courts on the map</h3>
       <label class="setrow"><span><b>Only courts near me</b><span class="muted small">Hide courts farther than this from you. Your ★ courts always show.</span></span>
         <input type="checkbox" id="setNear" class="toggle-switch"></label>
@@ -102,6 +116,12 @@
         <input type="checkbox" id="setAutocheck" class="toggle-switch"></label>
       <div class="muted small fine"><a href="privacy.html">Privacy</a></div>
     </div>
+  </dialog>
+
+  <!-- First visit: a short, skippable setup (text size, your courts, how you play, your name).
+       Screens are drawn by app.js into #welcomeBody. -->
+  <dialog id="welcome" class="acct welcome" aria-label="Welcome to CourtCast">
+    <div id="welcomeBody"></div>
   </dialog>
 
   <!-- Sign in / create account / profile. Screens are drawn by app.js into #acctBody. -->
