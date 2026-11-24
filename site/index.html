@@ -14,6 +14,14 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
+  <!-- Google Tag Manager (analytics). The GA4 tags live in the GTM container, not here.
+       site_env keeps staging/local tests apart from real visits. -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js",
+      site_env: /^(www\.)?tenniscourtcast\.com$/.test(location.hostname) ? "live" : "test" });
+  </script>
+  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-MNVVSF75"></script>
 </head>
 <body>
   <header class="top">
