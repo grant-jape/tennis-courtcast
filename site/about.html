@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About · Tennis CourtCast</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="description" content="What Tennis CourtCast is, how the 0–10 playability score and wind ratings work, and where the weather and court data come from.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap">
+  <style>
+    :root { --page: #f6f4ef; --surface: #ffffff; --ink: #1f2328; --ink-2: #555a61; --line: #e7e3da; --accent: #2a78d6; }
+    @media (prefers-color-scheme: dark) {
+      :root { --page: #141b23; --surface: #1f2833; --ink: #eef1f4; --ink-2: #b9c3cf; --line: #2c3846; --accent: #3987e5; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 500 16px/1.6 Nunito, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    .card { background: var(--surface); border-radius: 18px; padding: 20px 22px; box-shadow: 0 2px 10px rgb(40 35 25 / .12); }
+    h1 { font-size: 26px; font-weight: 800; margin: 0 0 4px; }
+    h2 { font-size: 18px; font-weight: 800; margin: 22px 0 6px; }
+    p, li { color: var(--ink-2); }
+    a { color: var(--accent); }
+    .muted { color: var(--ink-2); font-size: 14px; }
+    .back { display: inline-block; margin-bottom: 14px; font-weight: 700; text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 15px; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--ink); font-weight: 800; }
+    td { color: var(--ink-2); }
+    .tw { overflow-x: auto; }
+    .band { display: inline-block; min-width: 3.2em; text-align: center; border-radius: 8px; padding: 0 8px; color: #fff; font-weight: 800; }
+    .play { background: #0ca30c; } .iffy { background: #fab219; color: #3a2a00; } .skip { background: #d03b3b; }
+    .lead { font-size: 17px; color: var(--ink); }
+  </style>
+  <!-- Google AdSense (same library as the map page). No ad boxes on this page. -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2704836745352655" crossorigin="anonymous"></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="./">← Back to the map</a>
+    <div class="card">
+      <h1>About Tennis CourtCast</h1>
+      <div class="muted">Court-by-court tennis weather for Southern California</div>
+
+      <p class="lead">Rain at one park doesn't mean rain at the next town's courts. Fontana can be gusting 25 mph while Chino is calm. A single city forecast hides that, so CourtCast forecasts every court on its own and turns the weather into one question: is it good to play, and where?</p>
+      <p>The map covers 850+ public tennis courts at parks, colleges and schools, from Malibu and Santa Monica to Riverside, and from the San Fernando Valley down to Newport Beach and Irvine.</p>
+
+      <h2>What you can do</h2>
+      <ul>
+        <li><strong>See every court's score</strong> from 0 to 10 for the next 36 hours, on the map and in each court's card, with a 12-hour strip and the best two-hour window of daylight.</li>
+        <li><strong>Switch layers:</strong> <em>Play</em> (the overall score), <em>Wind</em> (gusts and their direction) and <em>Rain</em> (how much is forecast).</li>
+        <li><strong>Find your next good time.</strong> Star your courts and tell CourtCast when you usually play and how much wind you'll put up with; it finds the next two hours that suit you.</li>
+        <li><strong>Check whether courts are free.</strong> Players at a court tap how many are open. Without a recent report, CourtCast estimates how busy it's likely to be.</li>
+        <li><strong>Make it easy to read.</strong> Text size (Standard, Large, Extra large) is in ⚙ Settings.</li>
+      </ul>
+
+      <h2>How the score works</h2>
+      <p>Every hour starts at 10. Each thing that makes tennis worse takes points off, growing steadily between the point where it starts to matter and the point where it's at its worst:</p>
+      <div class="tw"><table>
+        <tr><th>What</th><th>Starts to matter</th><th>At its worst</th><th>Most points off</th></tr>
+        <tr><td>Rain this hour</td><td colspan="2">0.01 in or more</td><td>Score 0</td></tr>
+        <tr><td>Rain in the last hour</td><td colspan="2">0.01 in or more (courts still wet)</td><td>5</td></tr>
+        <tr><td>Rain 2–3 hours ago</td><td colspan="2">0.01 in or more (puddles drying)</td><td>2.5</td></tr>
+        <tr><td>Chance of rain</td><td>10%</td><td>100%</td><td>3</td></tr>
+        <tr><td>Gusts</td><td>12 mph</td><td>32 mph</td><td>7</td></tr>
+        <tr><td>Steady wind</td><td>8 mph</td><td>22 mph</td><td>4</td></tr>
+        <tr><td>Heat</td><td>88 °F</td><td>108 °F</td><td>4</td></tr>
+        <tr><td>Cold</td><td>48 °F</td><td>33 °F</td><td>3</td></tr>
+      </table></div>
+      <p><span class="band play">7+</span> Play &nbsp; <span class="band iffy">4–7</span> Iffy &nbsp; <span class="band skip">&lt;4</span> Skip</p>
+      <p>Every threshold is a judgment call for recreational tennis. A court card also lists the biggest reasons behind its score, such as "Gusts 18 mph".</p>
+
+      <h2>Why wind counts so much</h2>
+      <p>Wind also caps the score: a warm, dry afternoon with strong gusts still shows red. A simple physics model of a tennis ball in a crosswind shows why:</p>
+      <div class="tw"><table>
+        <tr><th>Crosswind</th><th>Serve toss pushed</th><th>Rally ball pushed</th><th>Lob pushed</th></tr>
+        <tr><td>10 mph</td><td>0.2 m</td><td>0.7 m</td><td>2.4 m</td></tr>
+        <tr><td>15 mph</td><td>0.4 m</td><td>1.1 m</td><td>3.7 m</td></tr>
+        <tr><td>20 mph</td><td>0.7 m</td><td>1.5 m</td><td>5.2 m</td></tr>
+        <tr><td>25 mph</td><td>1.0 m</td><td>1.9 m, wider than a doubles alley</td><td>6.8 m</td></tr>
+      </table></div>
+      <p>So the wind rating is <span class="band play">Play</span> for gusts up to 7 mph, <span class="band iffy">Iffy</span> from 8 to 24 mph, and <span class="band skip">Skip</span> at 25 mph and up (or steady wind of 18 mph and up). Gusts count more than steady wind: you can aim for a steady push, but not for a gust. If a breeze doesn't bother you, say so in the setup and your "next good time" will allow gusts up to 14 or 20 mph.</p>
+
+      <h2>Where the data comes from</h2>
+      <ul>
+        <li><strong>Weather:</strong> <a href="https://open-meteo.com/">Open-Meteo</a>, using NOAA's high-resolution HRRR model (3 km) for the first couple of days, blended into the GFS model after that. CourtCast fetches a forecast for every court and for a grid about every 3 km across the region, and refreshes it every 2 hours.</li>
+        <li><strong>Courts:</strong> <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, checked and corrected by players. School courts are behind a toggle in Settings because public access varies.</li>
+        <li><strong>Open-court reports, comments and ratings:</strong> players like you.</li>
+        <li><strong>Map:</strong> <a href="https://openfreemap.org/">OpenFreeMap</a> and <a href="https://maplibre.org/">MapLibre</a>.</li>
+      </ul>
+      <p>Forecasts are estimates and can be wrong, especially for pop-up showers. Always check the sky before you go. See the <a href="terms.html">terms of use</a>.</p>
+
+      <h2>A court is missing or wrong?</h2>
+      <p>Tell us on the <a href="https://github.com/grant-jape/tennis-courtcast/issues">GitHub page</a>, or rate the court from its card on the map. If enough players say a court isn't playable, the map marks it.</p>
+
+      <p class="muted"><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
+    </div>
+  </main>
+</body>
+</html>
