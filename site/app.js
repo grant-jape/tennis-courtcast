@@ -179,9 +179,11 @@
   }
   const readJSON = (k, fallback) => { try { const v = JSON.parse(store.get(k)); return v == null ? fallback : v; } catch (_) { return fallback; } };
 
-  // Analytics hook. Sends an event to Google Analytics once its tag (window.gtag) is on the page;
-  // until then it does nothing. Lets us see where people stop in the welcome setup.
-  const track = (name, params = {}) => { try { if (window.gtag) window.gtag("event", name, params); } catch (_) { /* never break the app */ } };
+  // Analytics: an event for Google Tag Manager (index.html loads it). GTM's own triggers decide what
+  // goes on to Google Analytics. Never send names, emails, locations or court picks, only counts and choices.
+  const track = (name, params = {}) => {
+    try { (window.dataLayer = window.dataLayer || []).push({ event: name, ...params }); } catch (_) { /* never break the app */ }
+  };
 
   // ---------- your preferences (welcome setup + Settings) ----------
   // Kept in this browser. Signed in, they're also saved to your account (Supabase user metadata),
