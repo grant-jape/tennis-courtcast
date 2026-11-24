@@ -121,6 +121,8 @@
     const q = new URLSearchParams(location.search), hq = new URLSearchParams(location.hash.slice(1));
     return { code: q.has("code"), reset: q.get("reset") === "1", error: q.get("error_description") || hq.get("error_description") };
   })();
+  // ?welcome (or #welcome) shows the welcome setup again, for testing or a fresh start.
+  const FORCE_WELCOME = new URLSearchParams(location.search).has("welcome") || /(^|[#&])welcome(&|=|$)/.test(location.hash);
   // After Google sign-in we come back with ?code=…; put the map back where the player was.
   try {
     const back = sessionStorage.getItem("cc-return");
@@ -175,6 +177,58 @@
     if (on) hiddenCourts.add(id); else hiddenCourts.delete(id);
     store.set("cc-hidden", JSON.stringify([...hiddenCourts]));
   }
+  const readJSON = (k, fallback) => { try { const v = JSON.parse(store.get(k)); return v == null ? fallback : v; } catch (_) { return fallback; } };
+
+  // Analytics hook. Sends an event to Google Analytics once its tag (window.gtag) is on the page;
+  // until then it does nothing. Lets us see where people stop in the welcome setup.
+  const track = (name, params = {}) => { try { if (window.gtag) window.gtag("event", name, params); } catch (_) { /* never break the app */ } };
+
+  // ---------- your preferences (welcome setup + Settings) ----------
+  // Kept in this browser. Signed in, they're also saved to your account (Supabase user metadata),
+  // so your text size and play style follow you to another phone or computer.
+  const TEXT_SIZES = { md: "Standard", lg: "Large", xl: "Extra large" };
+  // How much wind you'll play in. "calm" is the map's own rating (Play = gusts under 8 mph). The
+  // others also count an hour as good when wind is the ONLY thing in the way and it's under your limit.
+  const WIND_PREF = {
+    calm: { label: "Calm only", sub: "Gusts under 8 mph", gust: 7, wind: 7 },
+    some: { label: "A little is fine", sub: "Gusts up to 14 mph", gust: 14, wind: 11 },
+    easy: { label: "Wind doesn't bother me", sub: "Gusts up to 20 mph", gust: 20, wind: 15 },
+  };
+  const PLAY_TIMES = {   // Pacific hours, [from, to)
+    am: { label: "Mornings", sub: "6–11 AM", from: 6, to: 11 },
+    mid: { label: "Midday", sub: "11 AM–4 PM", from: 11, to: 16 },
+    pm: { label: "Evenings", sub: "4–9 PM", from: 16, to: 21 },
+  };
+  const prefs = {
+    text: TEXT_SIZES[store.get("cc-text")] ? store.get("cc-text") : "md",
+    wind: WIND_PREF[store.get("cc-wind")] ? store.get("cc-wind") : "calm",
+    times: readJSON("cc-times", []).filter((t) => PLAY_TIMES[t]),
+    name: (store.get("cc-name") || "").trim().slice(0, 40),
+  };
+  function applyTextSize() {
+    if (prefs.text === "md") delete document.documentElement.dataset.text;
+    else document.documentElement.dataset.text = prefs.text;
+    document.querySelectorAll("[data-text]").forEach((b) => {
+      if (b.tagName === "BUTTON") b.setAttribute("aria-pressed", String(b.dataset.text === prefs.text));
+    });
+    if (map) map.resize();
+  }
+  // Save one or more preferences: in this browser now, and to the account when signed in.
+  function setPrefs(changes, { sync = true } = {}) {
+    Object.assign(prefs, changes);
+    store.set("cc-text", prefs.text);
+    store.set("cc-wind", prefs.wind);
+    store.set("cc-times", JSON.stringify(prefs.times));
+    store.set("cc-name", prefs.name);
+    if ("text" in changes) applyTextSize();
+    if (sync && sb && community.user) {
+      const { text, wind, times } = prefs;
+      sb.auth.updateUser({ data: { cc_prefs: { text, wind, times } } }).catch(() => { /* kept on this device anyway */ });
+    }
+  }
+  // Guests' ★ courts live in this browser; signing in moves them into the account.
+  const localFavs = () => new Set(readJSON("cc-favs", []).filter((x) => typeof x === "string"));
+  community.favorites = localFavs();
 
   // A court the group hasn't marked in courts.csv still gets flagged from recent reviews
   // (last 90 days), when at least two players agree and they outnumber everyone else:
@@ -214,7 +268,7 @@
       if ((community.user && community.user.id) !== before) {
         community.comments.clear(); community.myVote.clear(); community.stats = null;
         // Supabase asks us not to call it from inside this callback, so load on the next tick.
-        setTimeout(async () => { await loadMine(); renderAcctBtn(); renderMarkers(); renderList(); renderCard(); }, 0);
+        setTimeout(async () => { await loadMine(); renderAcctBtn(); renderMarkers(); renderList(); renderCard(); renderForYou(); }, 0);
       }
       renderAcctBtn();
       renderCard();
@@ -238,13 +292,34 @@
   // The signed-in player's own profile and favorite courts (private to them).
   async function loadMine() {
     const u = community.user;
-    if (!u) { community.profile = null; community.favorites = new Set(); return; }
+    if (!u) { community.profile = null; community.favorites = localFavs(); return; }
     const [p, f] = await Promise.all([
       sb.from("profiles").select("display_name,created_at").eq("id", u.id).maybeSingle(),
       sb.from("favorite_courts").select("court_id").eq("user_id", u.id),
     ]);
     community.profile = p.data || null;
     community.favorites = new Set((f.data || []).map((r) => r.court_id));
+    // Courts starred as a guest on this device: add them to the account, then clear the device copy.
+    const fromGuest = [...localFavs()].filter((id) => !community.favorites.has(id));
+    let moveFailed = false;
+    if (fromGuest.length) {
+      const { error } = await sb.from("favorite_courts").insert(fromGuest.map((court_id) => ({ court_id })));
+      if (error) moveFailed = true;   // keep them on the device and try again next sign-in
+      else {
+        fromGuest.forEach((id) => community.favorites.add(id));
+        toast(`★ ${fromGuest.length} court${fromGuest.length === 1 ? " is" : "s are"} now saved to your account.`);
+      }
+    }
+    if (!moveFailed) store.set("cc-favs", "[]");
+    // Preferences: the account's win if it has some (another device set them); else save this device's.
+    const saved = (u.user_metadata || {}).cc_prefs;
+    if (saved && typeof saved === "object") {
+      setPrefs({
+        text: TEXT_SIZES[saved.text] ? saved.text : prefs.text,
+        wind: WIND_PREF[saved.wind] ? saved.wind : prefs.wind,
+        times: Array.isArray(saved.times) ? saved.times.filter((t) => PLAY_TIMES[t]) : prefs.times,
+      }, { sync: false });
+    } else if (store.get("cc-onboarded")) setPrefs({});
   }
   // One court's comments, plus the signed-in player's own vote there.
   async function loadCourt(courtId, force) {
@@ -376,10 +451,10 @@
     if (m === "signin" || m === "signup") {
       const up = m === "signup";
       html = `<h2>${up ? "Create your account" : "Sign in"}</h2>
-        <p class="muted small sub">${up ? "Save favorite courts, vote, comment, and report open courts." : "Welcome back to CourtCast."}</p>
+        <p class="muted small sub">${up ? "Keep your ★ courts and settings on every device, and comment, vote and report open courts." : "Welcome back to CourtCast."}</p>
         ${note}${google}${or}
         ${community.emailReady ? `<form data-form="${m}" novalidate>
-          ${up ? field("Name", "name", "text", "name", 'maxlength="40"') : ""}
+          ${up ? field("Name", "name", "text", "name", `maxlength="40" value="${esc(prefs.name)}"`) : ""}
           ${field("Email", "email", "email", "email", `value="${esc(acct.email)}"`)}
           ${field("Password", "password", "password", up ? "new-password" : "current-password", 'minlength="8"')}
           ${up ? '<div class="muted small">At least 8 characters.</div>'
@@ -552,13 +627,23 @@
   }
 
   // ---------- favorite courts ----------
-  async function toggleFavorite(id) {
-    if (!community.user) { openAccount("signin", "Sign in to save your favorite courts."); return; }
+  async function toggleFavorite(id, { quiet = false } = {}) {
     const on = community.favorites.has(id);
     if (!on && isHidden(id)) setHidden(id, false);   // starring a hidden court brings it back
     const flip = () => { if (on) community.favorites.add(id); else community.favorites.delete(id); };
     if (on) community.favorites.delete(id); else community.favorites.add(id);   // show it right away
-    renderMarkers(); renderList(); renderCard();
+    renderMarkers(); renderList(); renderCard(); renderForYou();
+    if (!on) track("favorite_add", { signed_in: !!community.user });
+    if (!community.user) {   // guest: kept in this browser, no account needed
+      store.set("cc-favs", JSON.stringify([...community.favorites]));
+      // Once, after the first star: the reason to sign up, at the moment it matters.
+      if (!on && !quiet && sb && (community.googleReady || community.emailReady) && !store.get("cc-favnudge")) {
+        store.set("cc-favnudge", "1");
+        track("signup_prompt", { from: "favorite" });
+        toast('★ Saved on this device. <button type="button" class="link" data-act="signup">Create a free account</button> to keep your courts on every device.', { ms: 10000 });
+      }
+      return;
+    }
     const { error } = on
       ? await sb.from("favorite_courts").delete().eq("user_id", community.user.id).eq("court_id", id)
       : await sb.from("favorite_courts").insert({ court_id: id });
@@ -805,6 +890,17 @@
       hideCourt(t.dataset.court || state.selected, t.dataset.act === "hide");
       return;
     }
+    if (t.dataset.act === "fav") {   // works signed out, too (kept in this browser)
+      e.preventDefault();
+      await toggleFavorite(t.dataset.court || state.selected);
+      return;
+    }
+    if (t.dataset.act === "signup") {
+      e.preventDefault();
+      if (t.closest("#toast")) hideToast();
+      openAccount("signup");
+      return;
+    }
     if (!sb) return;
     e.preventDefault();
     const box = t.closest(".community"), msg = box && box.querySelector(".msg");
@@ -827,8 +923,6 @@
       const { error } = await sb.from("court_comments").delete().eq("id", t.dataset.del);
       if (error) { say(`Couldn't delete: ${error.message}`); return; }
       await loadCourt(courtId, true);
-    } else if (act === "fav") {
-      await toggleFavorite(courtId);
     } else if (act === "locate") {
       await locate(true);
     } else if (act === "signin") {
@@ -1810,7 +1904,7 @@
     $("tiles").innerHTML = out.join("");
   }
 
-  function renderPanel(scroll) { renderHero(); renderHourly(scroll); renderTiles(); }
+  function renderPanel(scroll) { renderHero(); renderForYou(); renderHourly(scroll); renderTiles(); }
 
   // ---------- court card (the court's own details: links, crowd, votes, comments) ----------
   function select(id) {
@@ -2032,8 +2126,254 @@
     onRemove() { this.el.remove(); }
   }
 
+  // ---------- "For you": a greeting and your next good time to play ----------
+  // Looks at your ★ courts (or the 3 nearest you) for the soonest two daylight hours in a row that
+  // suit you: in the times you play, and either good to play on the map's own rating, or held back
+  // only by wind you said you'll play in.
+  const hourOfDay = (h) => Number(DATA.times[h].slice(11, 13));
+  // Wind's share of the score, the same ramps as courtcast/config.py (GUSTS and WIND). Keep in step.
+  const ramp = (v, start, full, max) => max * clamp01((v - start) / (full - start));
+  const windPenalty = (g, w) => ramp(g, 12, 32, 7) + ramp(w, 8, 22, 4);
+  function goodForYou(ct, h) {
+    if (!DATA.is_day[h]) return false;
+    const hr = hourOfDay(h);
+    if (prefs.times.length && !prefs.times.some((k) => hr >= PLAY_TIMES[k].from && hr < PLAY_TIMES[k].to)) return false;
+    if (ct.b[h] === "play") return "play";
+    if (prefs.wind === "calm") return false;
+    const lim = WIND_PREF[prefs.wind], why = ct.why[h] || [], g = ct.g[h], w = ct.w[h], s = ct.s[h];
+    if (!why.length || !why.every((r) => /^(Gusts|Wind) /.test(r)) || g > lim.gust || w > lim.wind) return false;
+    // The reasons only list the two biggest penalties. Check nothing else took a real bite: at the
+    // wind cap (6.9) the rest of the score is fine; below it, what wind doesn't explain must be small.
+    return s >= DATA.bands.play - 0.15 || 10 - windPenalty(g, w) - s < 0.75 ? "wind" : false;
+  }
+  function nextGoodTime() {
+    const favs = DATA.courts.filter((c) => community.favorites.has(c.id));
+    const pool = (favs.length ? favs : ME.pos ? nearestCourts(ME.pos.lat, ME.pos.lon).map((x) => x.c) : [])
+      .filter((c) => c.eff !== "closed" && !isHidden(c.id));
+    if (!pool.length) return null;
+    for (let h = state.base; h < DATA.times.length - 1; h++) {
+      let best = null;
+      pool.forEach((c) => {
+        const a = goodForYou(c, h), b = a && goodForYou(c, h + 1);
+        if (b && (!best || c.s[h] + c.s[h + 1] > best.c.s[h] + best.c.s[h + 1])) {
+          best = { c, h, breezy: a === "wind" || b === "wind" };
+        }
+      });
+      if (best) return best;
+    }
+    return { none: true, favs: !!favs.length };
+  }
+  function windowText(h) {
+    const a = hourOfDay(h), b = (a + 2) % 24, ap = (x) => (x < 12 ? "AM" : "PM"), t = (x) => x % 12 || 12;
+    if (h === state.base) return `Now until ${t(b)} ${ap(b)}`;
+    const span = ap(a) === ap(b) ? `${t(a)}–${t(b)} ${ap(b)}` : `${t(a)} ${ap(a)}–${t(b)} ${ap(b)}`;
+    return `${dayWord(DATA.times[h].slice(0, 10))} ${span}`;
+  }
+  function greeting() {
+    const hr = Number(pacificHourStamp().slice(11, 13));
+    return hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  }
+  function myFirstName() {
+    if (community.user) { const n = firstName(); return n === "Player" ? "" : n; }
+    return prefs.name.split(" ")[0];
+  }
+  function renderForYou() {
+    const el = $("forYou");
+    if (!el || !DATA) return;
+    const name = myFirstName(), ng = nextGoodTime();
+    if (!name && !ng && !store.get("cc-onboarded")) { el.hidden = true; return; }
+    let main;
+    if (!ng) {
+      main = `<div class="fy-main">☆ Star a court${navigator.geolocation ? ' or <button type="button" class="link" data-act="useloc">use your location</button>' : ""} to see your next good time to play.</div>`;
+    } else if (ng.none) {
+      main = `<div class="fy-main">No good two-hour stretch at ${ng.favs ? "your ★ courts" : "the courts near you"} in the next ${DATA.times.length - state.base} hours${prefs.times.length ? ", at the times you play" : ""}.</div>`;
+    } else {
+      const c = ng.c, s = c.s[ng.h], gust = Math.round(Math.max(c.g[ng.h], c.g[ng.h + 1]));
+      main = `<div class="fy-label">Your next good time</div>
+        <div class="fy-main"><b>${windowText(ng.h)}</b> at <button type="button" class="link" data-court="${c.id}">${esc(c.name)}</button>
+          <span class="fy-score ${c.b[ng.h]}">${s.toFixed(1)}</span></div>
+        ${ng.breezy ? `<div class="fy-note">Breezy, gusts to ${gust} mph: within what you said you'll play in.</div>` : ""}`;
+    }
+    const when = prefs.times.length ? prefs.times.map((k) => PLAY_TIMES[k].label).join(", ") : "Any daylight hour";
+    el.hidden = false;
+    el.innerHTML = `${name ? `<div class="fy-hi">${greeting()}, ${esc(name)}</div>` : ""}${main}
+      <div class="fy-sub">${esc(when)} · ${esc(WIND_PREF[prefs.wind].label.toLowerCase())} · <button type="button" class="link" data-act="personalize">Change</button></div>`;
+  }
+
+  // ---------- welcome: a short, skippable setup on the first visit ----------
+  // 1 text size · 2 your courts · 3 how you play · 4 your name, and an invitation to sign up.
+  // Nothing is required: every screen can be skipped, and guests get the whole app.
+  const WEL_STEPS = 4;
+  const wel = { step: 0, center: null, label: "", typed: "", busy: false, msg: "" };
+  // Someone who used CourtCast before this setup existed: don't make them sit through it.
+  function returningVisitor() {
+    try { return Object.keys(localStorage).some((k) => /^(cc-(useloc|near|radius|hidden|schools|favonly|autocheck)$|sb-)/.test(k)); } catch (_) { return false; }
+  }
+  function maybeWelcome() {
+    if (!FORCE_WELCOME) {
+      if (store.get("cc-onboarded") || LANDED.code || LANDED.reset || LANDED.error) return;
+      if (returningVisitor()) { store.set("cc-onboarded", "returning"); return; }
+      if (state.selected) return;   // came from a link to a court: show the court, set up next visit
+    }
+    openWelcome(0);
+  }
+  function openWelcome(step = 0) {
+    if ($("settings").open) $("settings").close();
+    wel.step = step;
+    wel.msg = "";
+    if (ME.pos) { wel.center = ME.pos; wel.label = ME.name; }
+    renderWelcome();
+    if (!$("welcome").open) $("welcome").showModal();
+    const nx = $("welcomeBody").querySelector('[data-w="next"]');
+    if (nx) nx.focus();   // Enter moves on (focus would otherwise land on "Skip setup")
+    track("welcome_step", { step: step + 1 });
+  }
+  function finishWelcome(how) {
+    const first = $("welcomeBody").querySelector('[name="first"]');
+    if (first) setPrefs({ name: first.value.trim().slice(0, 40) });
+    store.set("cc-onboarded", how === "skip" ? "skipped" : "done");
+    setPrefs({});
+    track(how === "skip" ? "welcome_skip" : "welcome_done",
+      { step: wel.step + 1, favorites: community.favorites.size, located: !!ME.pos, text_size: prefs.text });
+    if ($("welcome").open) $("welcome").close();
+    render();
+    // Open the map on what they just picked.
+    const fa = favArea();
+    if (fa) fitTo(fa.bounds, FAV_MAX_ZOOM, homePadding() + 40);
+    else if (ME.pos) goHome();
+  }
+  function welcomeCourtsHtml() {
+    if (!wel.center) return "";
+    const near = nearestCourts(wel.center.lat, wel.center.lon, 6);
+    return `<h3>Tap ☆ to save your courts${wel.label ? ` near ${esc(wel.label)}` : ""}</h3>
+      <ul class="wcourts">${near.map(({ c, m }) => {
+        const on = community.favorites.has(c.id);
+        return `<li><button type="button" data-wfav="${c.id}" aria-pressed="${on}"><span class="star" aria-hidden="true">${on ? "★" : "☆"}</span>
+          <span class="wc-txt"><b>${esc(c.name)}</b><span class="muted small">${esc(c.city)} · ${(m / MI).toFixed(1)} mi</span></span></button></li>`;
+      }).join("")}</ul>
+      <p class="muted small fine">${community.user ? "Saved to your account." : "Saved on this device. No account needed."}</p>`;
+  }
+  function renderWelcome() {
+    const s = wel.step;
+    const dots = `<div class="wdots" role="img" aria-label="Step ${s + 1} of ${WEL_STEPS}">${Array.from({ length: WEL_STEPS },
+      (_, i) => `<span class="${i === s ? "on" : i < s ? "done" : ""}"></span>`).join("")}</div>`;
+    let body, next = "Next";
+    if (s === 0) {
+      const ex = DATA.courts.filter((c) => c.type !== "school" && c.eff !== "closed")
+        .sort((a, b) => b.s[state.base] - a.s[state.base])[0];
+      const exBand = ex.b[state.base];
+      body = `<h2>Welcome to CourtCast 🎾</h2>
+        <p class="sub">Tennis weather for 850+ public courts in Southern California. Let's set it up for you. It takes under a minute.</p>
+        <h3>Pick a comfortable text size</h3>
+        <div class="textpick" role="group" aria-label="Text size">${Object.entries(TEXT_SIZES).map(([k, v]) =>
+          `<button type="button" data-text="${k}" aria-pressed="${prefs.text === k}"><span class="aa aa-${k}" aria-hidden="true">Aa</span>${v}</button>`).join("")}</div>
+        <div class="wpreview" aria-hidden="true">${courtSvg(exBand)}
+          <span class="wc-txt"><b>${esc(ex.name)}</b><span class="muted small">${esc(ex.city)} · ${esc(BAND[exBand].label)} right now</span></span>
+          <span class="fy-score ${exBand}">${ex.s[state.base].toFixed(1)}</span></div>
+        <p class="muted small fine">Change it any time in ⚙ Settings.</p>`;
+    } else if (s === 1) {
+      // Location may have arrived after the setup opened (allowed on an earlier visit): use it.
+      if (!wel.center && ME.pos) { wel.center = ME.pos; wel.label = ME.name; }
+      const cities = [...new Set(DATA.courts.map((c) => c.city))].sort();
+      body = `<h2>Where do you play?</h2>
+        <p class="sub">We'll show the courts near you first.</p>
+        ${navigator.geolocation ? `<button type="button" class="primary" data-w="locate"${wel.busy ? " disabled" : ""}>${
+          wel.busy ? "Finding you…" : ME.pos ? `📍 Using your location${ME.name ? ` · ${esc(ME.name)}` : ""}` : "📍 Use my location"}</button>
+        <p class="muted small fine">To find courts and weather near you. It's rounded to about 1 km and never stored by CourtCast. Turn it off any time in Settings.</p>
+        <div class="or"><span>or</span></div>` : ""}
+        <label class="wcity">Type your city<input name="city" list="wCities" autocomplete="off" placeholder="e.g. Pasadena" value="${esc(wel.typed)}"></label>
+        <datalist id="wCities">${cities.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
+        <div class="msg small" aria-live="polite">${esc(wel.msg)}</div>
+        <div id="wCourts">${welcomeCourtsHtml()}</div>`;
+    } else if (s === 2) {
+      body = `<h2>How do you like to play?</h2>
+        <p class="sub">We'll use this to find your next good time to play.</p>
+        <h3>Wind</h3>
+        <div class="wopts" role="radiogroup" aria-label="How much wind you'll play in">${Object.entries(WIND_PREF).map(([k, v]) =>
+          `<button type="button" role="radio" data-wwind="${k}" aria-checked="${prefs.wind === k}"><b>${v.label}</b><span class="muted small">${v.sub}</span></button>`).join("")}</div>
+        <h3>When do you usually play? <span class="muted small">Pick any</span></h3>
+        <div class="wopts three">${Object.entries(PLAY_TIMES).map(([k, v]) =>
+          `<button type="button" data-wtime="${k}" aria-pressed="${prefs.times.includes(k)}"><b>${v.label}</b><span class="muted small">${v.sub}</span></button>`).join("")}</div>`;
+    } else {
+      const canSign = !!sb && (community.googleReady || community.emailReady);
+      if (community.user) {
+        body = `<h2>You're all set${myFirstName() ? `, ${esc(myFirstName())}` : ""}</h2>
+          <p class="sub">You're signed in, so your courts and settings are saved to your account.</p>`;
+        next = "Done";
+      } else {
+        body = `<h2>What should we call you?</h2>
+          <label class="wname">First name <span class="muted small">(optional)</span>
+            <input name="first" maxlength="40" autocomplete="given-name" value="${esc(prefs.name)}"></label>
+          ${canSign ? `<div class="savebox"><b>Save your setup with a free account</b>
+            <ul><li>Your ★ courts and settings on every phone and computer</li><li>Comment on courts and rate their condition</li></ul>
+            <button type="button" class="primary" data-w="signup">Create a free account</button>
+            <button type="button" class="ghost wide" data-w="signin">I already have an account</button></div>` : ""}`;
+        next = canSign ? "Continue as guest" : "Done";
+      }
+    }
+    const last = s === WEL_STEPS - 1;
+    $("welcomeBody").innerHTML = `<div class="whead">${dots}${last ? "" : '<button type="button" class="link wskip" data-w="skip">Skip setup</button>'}</div>
+      ${body}
+      <div class="wfoot">
+        ${s > 0 ? '<button type="button" class="ghost" data-w="back">Back</button>' : "<span></span>"}
+        <button type="button" class="${last && next !== "Done" ? "ghost" : "primary"}" data-w="next" autofocus>${next}${last ? "" : " ›"}</button>
+      </div>`;
+  }
+  async function onWelcomeClick(e) {
+    const t = e.target.closest("[data-w], [data-text], [data-wfav], [data-wwind], [data-wtime]");
+    if (!t) return;
+    const body = $("welcomeBody");
+    if (t.dataset.text) {   // aria-pressed on every text-size button updates in applyTextSize()
+      setPrefs({ text: t.dataset.text });
+      track("text_size", { size: t.dataset.text, from: "welcome" });
+    } else if (t.dataset.wfav) {
+      await toggleFavorite(t.dataset.wfav, { quiet: true });
+      $("wCourts").innerHTML = welcomeCourtsHtml();
+    } else if (t.dataset.wwind) {
+      setPrefs({ wind: t.dataset.wwind });
+      body.querySelectorAll("[data-wwind]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.wwind === prefs.wind)));
+    } else if (t.dataset.wtime) {
+      const k = t.dataset.wtime, on = prefs.times.includes(k);
+      setPrefs({ times: on ? prefs.times.filter((x) => x !== k) : [...prefs.times, k].sort((a, b) => Object.keys(PLAY_TIMES).indexOf(a) - Object.keys(PLAY_TIMES).indexOf(b)) });
+      t.setAttribute("aria-pressed", String(!on));
+    } else if (t.dataset.w === "locate") {
+      if (ME.pos) { wel.center = ME.pos; wel.label = ME.name; wel.typed = ""; renderWelcome(); return; }
+      wel.busy = true; wel.msg = ""; renderWelcome();
+      const ok = await quietLocate();
+      wel.busy = false;
+      if (ok && ME.pos) { wel.center = ME.pos; wel.label = ME.name; wel.typed = ""; track("welcome_location", { ok: true }); }
+      else { wel.msg = "Couldn't get your location. Type your city instead."; track("welcome_location", { ok: false }); }
+      if (wel.step === 1 && $("welcome").open) renderWelcome();
+    } else if (t.dataset.w === "back") {
+      wel.step = Math.max(0, wel.step - 1); renderWelcome();
+    } else if (t.dataset.w === "next") {
+      if (wel.step === WEL_STEPS - 1) { finishWelcome("done"); return; }
+      wel.step += 1; renderWelcome();
+      track("welcome_step", { step: wel.step + 1 });
+    } else if (t.dataset.w === "skip") {
+      finishWelcome("skip");
+    } else if (t.dataset.w === "signup" || t.dataset.w === "signin") {
+      track("signup_prompt", { from: "welcome", choice: t.dataset.w });
+      finishWelcome("done");
+      openAccount(t.dataset.w);
+    }
+  }
+  // Typing a city: once it matches one of the court cities, list the courts there (no lookup service needed).
+  function onWelcomeInput(e) {
+    if (e.target.name !== "city") return;
+    wel.typed = e.target.value;
+    const v = wel.typed.trim().toLowerCase();
+    const cs = v ? DATA.courts.filter((c) => c.city.toLowerCase() === v) : [];
+    if (!cs.length) return;
+    const avg = (k) => cs.reduce((a, c) => a + c[k], 0) / cs.length;
+    wel.center = { lat: avg("lat"), lon: avg("lon") };
+    wel.label = cs[0].city;
+    $("wCourts").innerHTML = welcomeCourtsHtml();
+  }
+
   // ---------- settings ----------
   function openSettings() {
+    applyTextSize();
     $("schools").checked = state.schools;
     $("setUseloc").checked = !!ME.pos;
     $("setUseloc").disabled = !navigator.geolocation;
@@ -2065,6 +2405,22 @@
       render(); saveHash(); updateView();
     });
     $("settingsBtn").addEventListener("click", openSettings);
+    // Text size: the buttons in Settings (the welcome screen has its own copy of them).
+    $("settings").querySelectorAll("button[data-text]").forEach((b) => b.addEventListener("click", () => {
+      setPrefs({ text: b.dataset.text });
+      track("text_size", { size: b.dataset.text, from: "settings" });
+    }));
+    $("rerunWelcome").addEventListener("click", () => openWelcome(0));
+    $("welcome").addEventListener("click", onWelcomeClick);
+    $("welcome").addEventListener("input", onWelcomeInput);
+    $("welcome").addEventListener("cancel", (e) => { e.preventDefault(); finishWelcome("skip"); });   // Esc = skip
+    $("forYou").addEventListener("click", (e) => {
+      const t = e.target.closest("[data-court], [data-act]");
+      if (!t) return;
+      if (t.dataset.court) { select(t.dataset.court); saveHash(); }
+      else if (t.dataset.act === "personalize") openWelcome(1);
+      else if (t.dataset.act === "useloc") useMyLocation();
+    });
     $("filterChip").addEventListener("click", openSettings);
     $("unhideAll").addEventListener("click", () => {
       [...hiddenCourts].forEach((id) => setHidden(id, false));
@@ -2091,7 +2447,7 @@
       filt.favOnly = e.target.checked;
       store.set("cc-favonly", filt.favOnly ? "on" : "off");
       if (filt.favOnly && !community.favorites.size) {
-        toast(community.user ? "No ★ courts yet. Tap ☆ on a court to add it." : "Sign in, then tap ☆ on a court to save it as a favorite.");
+        toast("No ★ courts yet. Tap ☆ on a court to add it.");
       }
       applyFilter(filterMode() !== "all");
     });
@@ -2199,6 +2555,8 @@
       if (state.selected) select(state.selected);
       initCommunity();   // reviews load after the map, so they never slow down the forecast
       openHome();        // your ★ courts or your area, not all of SoCal
+      applyTextSize();   // (already applied in <head>; this marks the right Settings button)
+      maybeWelcome();    // first visit: the short setup
     });
   }
 
