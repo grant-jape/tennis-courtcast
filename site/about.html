@@ -33,6 +33,20 @@
     .play { background: #0ca30c; } .iffy { background: #fab219; color: #3a2a00; } .skip { background: #d03b3b; }
     .lead { font-size: 17px; color: var(--ink); }
   </style>
+  <!-- Google Analytics (G-M1SCX3VWVH), loaded directly. Live site only, so staging and local tests stay
+       out of the numbers. app.js sends CourtCast's own events with gtag("event", ...). -->
+  <script>
+    if (/^(www\.)?tenniscourtcast\.com$/.test(location.hostname)) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { dataLayer.push(arguments); };
+      gtag("js", new Date());
+      gtag("config", "G-M1SCX3VWVH");
+      var ga = document.createElement("script");
+      ga.async = true;
+      ga.src = "https://www.googletagmanager.com/gtag/js?id=G-M1SCX3VWVH";
+      document.head.appendChild(ga);
+    }
+  </script>
   <!-- Google AdSense (same library as the map page). No ad boxes on this page. -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2704836745352655" crossorigin="anonymous"></script>
 </head>
