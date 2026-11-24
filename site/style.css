@@ -806,3 +806,19 @@ dialog.welcome { width: min(460px, calc(100vw - 20px)); }
 .brand { min-width: 0; }
 .top h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .acct-btn { white-space: nowrap; }
+
+/* ---------- "Get the CourtCast app" card + iPhone steps ---------- */
+.foryou.install { display: flex; flex-direction: column; gap: 10px; }
+.foryou.install[hidden] { display: none; }
+.in-row { display: flex; align-items: center; gap: 12px; }
+.in-row img { width: 44px; height: 44px; border-radius: 11px; flex: none; box-shadow: var(--shadow-sm); }
+.in-row b { font-weight: 900; font-size: 1rem; }
+.in-btns { display: flex; gap: 8px; }
+.in-btns button {
+  border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-weight: 800; cursor: pointer;
+}
+.in-btns .primary { flex: 1; background: var(--accent); color: #fff; }
+.in-btns .ghost { background: var(--page); color: var(--ink); }
+.isteps { margin: 8px 0 12px; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 1rem; }
+.ishare { width: 1.2em; height: 1.2em; vertical-align: -0.2em; color: var(--accent); }
+#installHelp .primary.wide { width: 100%; margin-top: 10px; }

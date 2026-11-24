@@ -2243,6 +2243,7 @@
       { step: wel.step + 1, favorites: community.favorites.size, located: !!ME.pos, text_size: prefs.text });
     if ($("welcome").open) $("welcome").close();
     render();
+    renderInstall();
     // Open the map on what they just picked.
     const fa = favArea();
     if (fa) fitTo(fa.bounds, FAV_MAX_ZOOM, homePadding() + 40);
@@ -2377,9 +2378,60 @@
     $("wCourts").innerHTML = welcomeCourtsHtml();
   }
 
+  // ---------- "Get the CourtCast app": add it to the home screen ----------
+  // Android / desktop Chrome and Edge: the browser's own install prompt (one tap). iPhone / iPad: Safari
+  // has no install button, so we show the "Share -> Add to Home Screen" steps. Never shown to people who
+  // already have it, never during the welcome setup, and "Not now" holds for 30 days. Always in Settings.
+  const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const runningAsApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let installEvt = null;   // the browser's saved install prompt, when it offers one
+  addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; renderInstall(); });
+  addEventListener("appinstalled", () => {
+    installEvt = null;
+    store.set("cc-installed", "1");
+    track("app_installed");
+    renderInstall();
+    toast("🎾 CourtCast is on your home screen.");
+  });
+  const canInstall = () => !runningAsApp() && !store.get("cc-installed") && (!!installEvt || IS_IOS);
+  const INSTALL_SNOOZE = 30 * 24 * 3600 * 1000;
+  let installSeen = false;
+  function renderInstall() {
+    const card = $("installCard"), row = $("installRow");
+    if (!card || !row) return;
+    const can = canInstall();
+    row.hidden = !can;
+    const snoozed = Date.now() - Number(store.get("cc-install-later") || 0) < INSTALL_SNOOZE;
+    const show = can && !snoozed && !!store.get("cc-onboarded") && !($("welcome") && $("welcome").open);
+    card.hidden = !show;
+    if (!show) return;
+    card.innerHTML = `<div class="in-row"><img src="icon-192.png" alt="">
+        <div><b>Get the CourtCast app</b>
+          <div class="fy-note">Add it to your home screen: it opens full screen, one tap away. Free, no app store.</div></div></div>
+      <div class="in-btns"><button type="button" class="primary" data-act="install">${IS_IOS && !installEvt ? "Show me how" : "Install"}</button>
+        <button type="button" class="ghost" data-act="install-later">Not now</button></div>`;
+    if (!installSeen) { installSeen = true; track("install_shown", { ios: IS_IOS && !installEvt }); }
+  }
+  async function installApp(from) {
+    track("install_click", { from, ios: IS_IOS && !installEvt });
+    if (installEvt) {
+      const evt = installEvt;
+      installEvt = null;   // a saved prompt can only be used once
+      evt.prompt();
+      const { outcome } = await evt.userChoice;
+      track("install_prompt", { outcome });
+      if (outcome === "dismissed") store.set("cc-install-later", String(Date.now()));
+      renderInstall();
+    } else if (IS_IOS) {
+      if ($("settings").open) $("settings").close();
+      $("installHelp").showModal();
+    }
+  }
+
   // ---------- settings ----------
   function openSettings() {
     applyTextSize();
+    renderInstall();
     $("schools").checked = state.schools;
     $("setUseloc").checked = !!ME.pos;
     $("setUseloc").disabled = !navigator.geolocation;
@@ -2417,6 +2469,20 @@
       track("text_size", { size: b.dataset.text, from: "settings" });
     }));
     $("rerunWelcome").addEventListener("click", () => openWelcome(0));
+    $("installBtn").addEventListener("click", () => installApp("settings"));
+    $("installCard").addEventListener("click", (e) => {
+      const t = e.target.closest("[data-act]");
+      if (!t) return;
+      if (t.dataset.act === "install") installApp("card");
+      else if (t.dataset.act === "install-later") {
+        store.set("cc-install-later", String(Date.now()));
+        track("install_dismiss");
+        renderInstall();
+      }
+    });
+    $("installHelp").addEventListener("click", (e) => {
+      if (e.target === $("installHelp") || e.target.closest('[data-act="close"]')) $("installHelp").close();
+    });
     $("welcome").addEventListener("click", onWelcomeClick);
     $("welcome").addEventListener("input", onWelcomeInput);
     $("welcome").addEventListener("cancel", (e) => { e.preventDefault(); finishWelcome("skip"); });   // Esc = skip
@@ -2563,6 +2629,7 @@
       openHome();        // your ★ courts or your area, not all of SoCal
       applyTextSize();   // (already applied in <head>; this marks the right Settings button)
       maybeWelcome();    // first visit: the short setup
+      renderInstall();   // "Get the CourtCast app", once set up
     });
   }
 
