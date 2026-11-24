@@ -1464,6 +1464,14 @@
   // ---------- live detail from Open-Meteo for the place on screen ----------
   // 10-day forecast, feels like, dew point, visibility, pressure, UV and air quality, fetched by the
   // browser for whatever place is showing (rounded to ~1 km) and kept for 30 minutes.
+  // Where the browser gets live weather. Empty: Open-Meteo's free API directly (non-commercial use).
+  // Set to the CourtCast weather proxy (cron/weather-proxy.js, e.g. "https://wx.tenniscourtcast.com")
+  // once the paid plan is live: the proxy adds the key, so it never appears here. No fallback to the
+  // free API when the proxy is set; if it's down, the panel keeps the build's numbers.
+  const WX_PROXY = "";
+  const WX_URL = WX_PROXY
+    ? { f: `${WX_PROXY}/v1/forecast`, aq: `${WX_PROXY}/v1/air-quality` }
+    : { f: "https://api.open-meteo.com/v1/forecast", aq: "https://air-quality-api.open-meteo.com/v1/air-quality" };
   const WX = new Map();
   const wxKey = (lat, lon) => `${lat.toFixed(2)},${lon.toFixed(2)}`;
   function wxFor(pl) {
@@ -1487,8 +1495,8 @@
     let data = prev && prev.data;
     try {
       const [f, a] = await Promise.all([
-        fetch(`https://api.open-meteo.com/v1/forecast?${fq}`).then((r) => (r.ok ? r.json() : null)),
-        fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${aq}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch(`${WX_URL.f}?${fq}`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`${WX_URL.aq}?${aq}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
       if (f && f.hourly) data = { f, aq: a && a.hourly ? a : null, ix: new Map(f.hourly.time.map((t, i) => [t, i])),
         aix: a && a.hourly ? new Map(a.hourly.time.map((t, i) => [t, i])) : new Map() };

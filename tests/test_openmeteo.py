@@ -59,3 +59,27 @@ class TestRateLimitRetry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KeySwitchTest(unittest.TestCase):
+    def test_free_endpoint_without_key(self):
+        with mock.patch.dict("os.environ", {"OPEN_METEO_API_KEY": ""}):
+            base, params = openmeteo.endpoint({"latitude": 34})
+        self.assertEqual(base, "https://api.open-meteo.com/v1/forecast")
+        self.assertNotIn("apikey", params)
+
+    def test_paid_endpoint_with_key(self):
+        with mock.patch.dict("os.environ", {"OPEN_METEO_API_KEY": " abc123 "}):
+            base, params = openmeteo.endpoint({"latitude": 34})
+        self.assertEqual(base, "https://customer-api.open-meteo.com/v1/forecast")
+        self.assertEqual(params, {"latitude": 34, "apikey": "abc123"})
+
+    def test_request_goes_to_paid_host_with_key(self):
+        ok = mock.MagicMock()
+        ok.__enter__.return_value.read.return_value = b"{}"
+        with mock.patch.dict("os.environ", {"OPEN_METEO_API_KEY": "abc123"}), \
+             mock.patch("urllib.request.urlopen", return_value=ok) as urlopen:
+            openmeteo._get({"latitude": 34})
+        url = urlopen.call_args[0][0].full_url
+        self.assertTrue(url.startswith("https://customer-api.open-meteo.com/v1/forecast?"))
+        self.assertIn("apikey=abc123", url)

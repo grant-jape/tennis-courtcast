@@ -64,6 +64,10 @@ jobs:
         if: steps.plan.outputs.fetch == 'yes'
         continue-on-error: true   # a weather-API outage shouldn't block publishing site changes
         timeout-minutes: 15
+        env:
+          # Paid Open-Meteo key (commercial licence). Unset = the free API. Set it with:
+          #   gh secret set OPEN_METEO_API_KEY
+          OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
         run: python -m courtcast.build --out site/data/forecast.json --snapshot-dir data/snapshots
 
       - name: Use the last published forecast (not fetching, or the fetch failed)

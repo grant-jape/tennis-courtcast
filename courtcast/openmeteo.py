@@ -1,10 +1,14 @@
-"""Fetch hourly forecasts for many points from Open-Meteo (free, no key).
+"""Fetch hourly forecasts for many points from Open-Meteo.
+
+Free API by default. With OPEN_METEO_API_KEY set (a GitHub Actions secret), the build uses
+Open-Meteo's paid commercial endpoint instead: same request, different host, plus &apikey=.
 
 Open-Meteo accepts comma-separated lists of coordinates and returns one result
 per point, so ~150 points take 3-4 requests.
 """
 
 import json
+import os
 import time
 import urllib.error
 import urllib.parse
@@ -12,14 +16,24 @@ import urllib.request
 
 from . import config as C
 
-URL = "https://api.open-meteo.com/v1/forecast"
+URL = "https://api.open-meteo.com/v1/forecast"                    # free, non-commercial
+PAID_URL = "https://customer-api.open-meteo.com/v1/forecast"      # with an API key (commercial licence)
+
+
+def endpoint(params):
+    """(base URL, params) to use: the paid endpoint with the key when OPEN_METEO_API_KEY is set."""
+    key = os.environ.get("OPEN_METEO_API_KEY", "").strip()
+    if not key:
+        return URL, params
+    return PAID_URL, {**params, "apikey": key}
 
 
 def _get(params, retries=6):
     """GET with retries. GitHub's runners share IP addresses with other projects,
     so Open-Meteo's per-IP rate limit (HTTP 429) can trip from someone else's
     traffic; those waits need to be long (and follow Retry-After when given)."""
-    url = URL + "?" + urllib.parse.urlencode(params)
+    base, params = endpoint(params)
+    url = base + "?" + urllib.parse.urlencode(params)   # never print this: it can hold the key
     req = urllib.request.Request(url, headers={"User-Agent": "tennis-courtcast/0.1"})
     for attempt in range(retries):
         try:
