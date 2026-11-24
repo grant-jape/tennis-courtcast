@@ -15,7 +15,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: update-forecast
+  # One queue per branch. GitHub keeps only ONE waiting run per group, and a newer one cancels it,
+  # so with a shared group a push to a preview branch (or staging) could cancel a waiting live
+  # deploy from main (it did on 2026-11-24). Runs on main (pushes, timer, manual) still share a
+  # queue, so two forecast builds never overlap, and the newest main run publishes the latest site.
+  group: update-forecast-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
