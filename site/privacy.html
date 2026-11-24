@@ -25,6 +25,20 @@
     .muted { color: var(--ink-2); font-size: 14px; }
     .back { display: inline-block; margin-bottom: 14px; font-weight: 700; text-decoration: none; }
   </style>
+  <!-- Google Analytics (G-M1SCX3VWVH), loaded directly. Live site only, so staging and local tests stay
+       out of the numbers. app.js sends CourtCast's own events with gtag("event", ...). -->
+  <script>
+    if (/^(www\.)?tenniscourtcast\.com$/.test(location.hostname)) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { dataLayer.push(arguments); };
+      gtag("js", new Date());
+      gtag("config", "G-M1SCX3VWVH");
+      var ga = document.createElement("script");
+      ga.async = true;
+      ga.src = "https://www.googletagmanager.com/gtag/js?id=G-M1SCX3VWVH";
+      document.head.appendChild(ga);
+    }
+  </script>
   <!-- Google AdSense (same library as the map page). No ad boxes on this page. -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2704836745352655" crossorigin="anonymous"></script>
 </head>
@@ -49,7 +63,7 @@
       <h2>Without an account</h2>
       <p>If you don't sign in, your ★ courts, text size, first name and play preferences (wind, usual times) are kept only in this browser's storage on your device. We never receive them. Clearing your browser data removes them. If you later create an account, your ★ courts and preferences are copied into it so they work on your other devices.</p>
       <h2>Analytics</h2>
-      <p>We use <a href="https://policies.google.com/technologies/partner-sites">Google Analytics</a> (loaded through Google Tag Manager) to count visits and see which features get used. Google sets cookies to tell visits apart and receives standard visit details such as the page address, your browser and device type, and your approximate area from your internet address. We never send it your name, email, precise location or which courts you starred. You can block it with your browser's cookie or tracker settings, or with <a href="https://tools.google.com/dlpage/gaoptout">Google's opt-out add-on</a>.</p>
+      <p>We use <a href="https://policies.google.com/technologies/partner-sites">Google Analytics</a> to count visits and see which features get used. Google sets cookies to tell visits apart and receives standard visit details such as the page address, your browser and device type, and your approximate area from your internet address. We never send it your name, email, precise location or which courts you starred. You can block it with your browser's cookie or tracker settings, or with <a href="https://tools.google.com/dlpage/gaoptout">Google's opt-out add-on</a>.</p>
       <h2>Advertising</h2>
       <p>CourtCast is free because it shows ads from <a href="https://policies.google.com/technologies/ads">Google AdSense</a>. Third-party vendors, including Google, use cookies to serve ads based on your earlier visits to this and other websites. Google's advertising cookies let it and its partners show you ads based on those visits.</p>
       <p>You can turn off personalized ads in <a href="https://myadcenter.google.com/">Google's My Ad Center</a>, and opt out of other vendors' personalized ads at <a href="https://www.aboutads.info/choices/">aboutads.info</a>. California residents can also opt out of the "sale" or "sharing" of personal information for ads with the "Do not sell or share my personal information" choice shown on this site. Ads never receive your account details, precise location or the courts you starred.</p>

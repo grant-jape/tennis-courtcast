@@ -179,10 +179,11 @@
   }
   const readJSON = (k, fallback) => { try { const v = JSON.parse(store.get(k)); return v == null ? fallback : v; } catch (_) { return fallback; } };
 
-  // Analytics: an event for Google Tag Manager (index.html loads it). GTM's own triggers decide what
-  // goes on to Google Analytics. Never send names, emails, locations or court picks, only counts and choices.
+  // Analytics: an event straight to Google Analytics (index.html loads it on the live site only; elsewhere
+  // window.gtag doesn't exist and this does nothing). Never send names, emails, locations or court picks,
+  // only counts and choices.
   const track = (name, params = {}) => {
-    try { (window.dataLayer = window.dataLayer || []).push({ event: name, ...params }); } catch (_) { /* never break the app */ }
+    try { if (typeof window.gtag === "function") window.gtag("event", name, params); } catch (_) { /* never break the app */ }
   };
 
   // ---------- your preferences (welcome setup + Settings) ----------

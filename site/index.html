@@ -20,14 +20,20 @@
   <link rel="stylesheet" href="style.css">
   <!-- Apply the saved text size before anything is drawn, so big text never flashes small. -->
   <script>try { var cct = localStorage.getItem("cc-text"); if (cct === "lg" || cct === "xl") document.documentElement.dataset.text = cct; } catch (e) {}</script>
-  <!-- Google Tag Manager (analytics). The GA4 tags live in the GTM container, not here.
-       site_env keeps staging/local tests apart from real visits. -->
+  <!-- Google Analytics (G-M1SCX3VWVH), loaded directly. Live site only, so staging and local tests stay
+       out of the numbers. app.js sends CourtCast's own events with gtag("event", ...). -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js",
-      site_env: /^(www\.)?tenniscourtcast\.com$/.test(location.hostname) ? "live" : "test" });
+    if (/^(www\.)?tenniscourtcast\.com$/.test(location.hostname)) {
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { dataLayer.push(arguments); };
+      gtag("js", new Date());
+      gtag("config", "G-M1SCX3VWVH");
+      var ga = document.createElement("script");
+      ga.async = true;
+      ga.src = "https://www.googletagmanager.com/gtag/js?id=G-M1SCX3VWVH";
+      document.head.appendChild(ga);
+    }
   </script>
-  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-MNVVSF75"></script>
   <!-- Google AdSense: site verification and the ad library. No ad boxes are placed yet, and Auto ads
        stay off in AdSense (they'd cover the map), so this shows no ads on its own. -->
   <meta name="google-adsense-account" content="ca-pub-2704836745352655">
