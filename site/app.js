@@ -467,7 +467,7 @@
         <div class="switch small">${up
           ? 'Already have an account? <a href="#" data-act="mode" data-mode="signin">Sign in</a>'
           : 'New to CourtCast? <a href="#" data-act="mode" data-mode="signup">Create an account</a>'}</div>
-        <div class="muted small fine">How we use your info: <a href="privacy.html">Privacy</a></div>`;
+        <div class="muted small fine">${up ? 'By creating an account you agree to the <a href="terms.html">Terms</a>. ' : ""}How we use your info: <a href="privacy.html">Privacy</a></div>`;
     } else if (m === "forgot") {
       html = `<h2>Reset your password</h2>
         <p class="muted small sub">We'll email you a link to pick a new one.</p>${note}
