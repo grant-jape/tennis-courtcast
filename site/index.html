@@ -6,6 +6,10 @@
   <title>Tennis CourtCast</title>
   <meta name="description" content="Court-by-court tennis weather for Southern California, from the coast to the Inland Empire: is it good to play, and where?">
   <meta name="theme-color" content="#2f7fd6">
+  <!-- Added to an iPhone home screen: open full screen, labelled "CourtCast". -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CourtCast">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -49,6 +53,9 @@
 
       <!-- "For you": a greeting and your next good time to play, from the welcome setup. -->
       <section id="forYou" class="foryou" hidden></section>
+
+      <!-- "Get the CourtCast app": add it to the home screen (no app store). Drawn by app.js. -->
+      <section id="installCard" class="foryou install" hidden></section>
 
       <section class="hourly-wrap">
         <div class="sect-title">Hourly forecast <span class="muted">· tap an hour</span></div>
@@ -98,6 +105,8 @@
           <button type="button" data-text="lg" aria-pressed="false">Large</button>
           <button type="button" data-text="xl" aria-pressed="false">Extra large</button>
         </div></div>
+      <div class="setrow" id="installRow" hidden><span><b>Install the app</b><span class="muted small">Add CourtCast to your home screen. Free, no app store.</span></span>
+        <button type="button" id="installBtn" class="pill-btn">Install</button></div>
       <div class="setrow"><span><b>Personalize</b><span class="muted small">Your name, courts, and when and how you like to play.</span></span>
         <button type="button" id="rerunWelcome" class="pill-btn">Set up</button></div>
       <h3 class="setsect">Courts on the map</h3>
@@ -126,6 +135,21 @@
        Screens are drawn by app.js into #welcomeBody. -->
   <dialog id="welcome" class="acct welcome" aria-label="Welcome to CourtCast">
     <div id="welcomeBody"></div>
+  </dialog>
+
+  <!-- iPhone/iPad: Safari has no install button, so show the steps. -->
+  <dialog id="installHelp" class="acct" aria-label="Add CourtCast to your home screen">
+    <button class="x" data-act="close" aria-label="Close">×</button>
+    <div class="setbody">
+      <h2>Add CourtCast to your home screen</h2>
+      <ol class="isteps">
+        <li>Tap the <b>Share</b> button <svg class="ishare" viewBox="0 0 20 20" aria-label="Share icon"><path d="M10 2.5v10M6.5 6 10 2.5 13.5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9H4.5v8.5h11V9H14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg> in Safari's toolbar.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b>. CourtCast appears with your other apps and opens full screen.</li>
+      </ol>
+      <p class="muted small">In Chrome on an iPhone, tap Share at the top right, then <b>Add to Home Screen</b>.</p>
+      <button type="button" class="primary wide" data-act="close">Got it</button>
+    </div>
   </dialog>
 
   <!-- Sign in / create account / profile. Screens are drawn by app.js into #acctBody. -->
